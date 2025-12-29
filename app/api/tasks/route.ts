@@ -45,19 +45,35 @@ export async function POST(request: NextRequest) {
     if ((session.user as any).role !== 'admin') return NextResponse.json({ error: 'Only admins can create tasks' }, { status: 403 });
 
     const taskData = await request.json();
-    const { error } = await supabaseAdmin.from('tasks').insert([{
-      task_id: taskData.id || Date.now().toString(),
-      title: taskData.title,
+    const taskId = Date.now().toString();
+
+    const newTask = {
+      task_id: taskId,
+      title: taskData.title || '',
       company: taskData.company,
       week: taskData.week,
       status: taskData.status || 'todo',
       assignee: taskData.assignee || null,
       due_date: taskData.dueDate,
       comments: []
-    }]);
+    };
+
+    const { data, error } = await supabaseAdmin.from('tasks').insert([newTask]).select().single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ message: 'Task created' });
+
+    // Return formatted task matching the frontend format
+    return NextResponse.json({
+      _id: data.id,
+      id: data.task_id,
+      title: data.title,
+      company: data.company,
+      week: data.week,
+      status: data.status,
+      assignee: data.assignee,
+      dueDate: data.due_date,
+      comments: data.comments || []
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

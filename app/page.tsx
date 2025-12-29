@@ -85,7 +85,7 @@ export default function DashboardPage() {
     }
   };
 
-  const updateTask = async (taskId: string, updates: Partial<Task>) => {
+  const updateTask = async (taskId: string, updates: Partial<Task>, closeModal: boolean = false) => {
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PATCH',
@@ -98,16 +98,20 @@ export default function DashboardPage() {
       if (response.ok) {
         const updatedTask = await response.json();
         setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
-        if (selectedTask && selectedTask.id === taskId) {
+        // Only update selectedTask if we're not about to close the modal
+        if (!closeModal && selectedTask && selectedTask.id === taskId) {
           setSelectedTask(updatedTask);
         }
+        return true;
       } else {
         const error = await response.json();
         alert(error.error || 'Failed to update task');
+        return false;
       }
     } catch (error) {
       console.error('Failed to update task:', error);
       alert('Failed to update task');
+      return false;
     }
   };
 
@@ -560,7 +564,7 @@ function TaskModal({
 }: {
   task: Task;
   onClose: () => void;
-  onUpdate: (taskId: string, updates: Partial<Task>) => void;
+  onUpdate: (taskId: string, updates: Partial<Task>, closeModal?: boolean) => Promise<boolean>;
   onAddComment: (taskId: string, text: string) => void;
   onDelete: (taskId: string) => void;
   canDelete: boolean;
@@ -568,14 +572,19 @@ function TaskModal({
 }) {
   const [editedTask, setEditedTask] = useState(task);
   const [newComment, setNewComment] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setEditedTask(task);
   }, [task]);
 
-  const handleSave = () => {
-    onUpdate(task.id, editedTask);
-    onClose();
+  const handleSave = async () => {
+    setIsSaving(true);
+    const success = await onUpdate(task.id, editedTask, true);
+    setIsSaving(false);
+    if (success) {
+      onClose();
+    }
   };
 
   const handleAddComment = () => {
@@ -717,20 +726,23 @@ function TaskModal({
                 <>
                   <button
                     onClick={handleSave}
-                    className="flex-1 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900"
+                    disabled={isSaving}
+                    className="flex-1 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 disabled:bg-gray-400 disabled:cursor-not-allowed"
                   >
-                    Save Changes
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                   <button
                     onClick={onClose}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                    disabled={isSaving}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   {canDelete && (
                     <button
                       onClick={() => onDelete(task.id)}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                      disabled={isSaving}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-300"
                       title="Delete this task"
                     >
                       Delete

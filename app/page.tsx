@@ -178,6 +178,34 @@ export default function DashboardPage() {
     return `2025-01-${String(day).padStart(2, '0')}`;
   };
 
+  const deleteTask = async (taskId: string) => {
+    if (!confirm('Are you sure you want to delete this task?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        await fetchTasks();
+        setSelectedTask(null);
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to delete task');
+      }
+    } catch (error) {
+      console.error('Failed to delete task:', error);
+      alert('Failed to delete task');
+    }
+  };
+
+  const canDeleteTask = (taskId: string) => {
+    const ORIGINAL_TASK_IDS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24'];
+    return !ORIGINAL_TASK_IDS.includes(taskId);
+  };
+
   const handleDragStart = (e: React.DragEvent, task: Task) => {
     if (!isAdmin) {
       e.preventDefault();
@@ -346,6 +374,8 @@ export default function DashboardPage() {
             onClose={() => setSelectedTask(null)}
             onUpdate={updateTask}
             onAddComment={addComment}
+            onDelete={deleteTask}
+            canDelete={canDeleteTask(selectedTask.id)}
             isAdmin={isAdmin}
           />
         )}
@@ -473,12 +503,16 @@ function TaskModal({
   onClose,
   onUpdate,
   onAddComment,
+  onDelete,
+  canDelete,
   isAdmin
 }: {
   task: Task;
   onClose: () => void;
   onUpdate: (taskId: string, updates: Partial<Task>) => void;
   onAddComment: (taskId: string, text: string) => void;
+  onDelete: (taskId: string) => void;
+  canDelete: boolean;
   isAdmin: boolean;
 }) {
   const [editedTask, setEditedTask] = useState(task);
@@ -642,6 +676,15 @@ function TaskModal({
                   >
                     Cancel
                   </button>
+                  {canDelete && (
+                    <button
+                      onClick={() => onDelete(task.id)}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                      title="Delete this task"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </>
               ) : (
                 <button

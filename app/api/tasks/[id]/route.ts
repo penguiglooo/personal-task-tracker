@@ -59,6 +59,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if ((session.user as any).role !== 'admin') return NextResponse.json({ error: 'Only admins can delete tasks' }, { status: 403 });
 
     const { id } = await params;
+
+    // Prevent deletion of original tasks (task IDs 1-24)
+    const ORIGINAL_TASK_IDS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24'];
+    if (ORIGINAL_TASK_IDS.includes(id)) {
+      return NextResponse.json({ error: 'Cannot delete original tasks' }, { status: 403 });
+    }
+
     const { error } = await supabaseAdmin.from('tasks').delete().eq('task_id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

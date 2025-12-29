@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
     const userName = session.user.name;
 
     let query = supabaseAdmin.from('tasks').select('*').order('due_date', { ascending: true });
-    
+
     if (userRole === 'viewer') {
-      query = query.eq('assignee', userName);
+      query = query.contains('assignees', [userName]);
     }
 
     const { data: tasks, error } = await query;
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       company: task.company,
       week: task.week,
       status: task.status,
-      assignee: task.assignee,
+      assignees: task.assignees || [],
       dueDate: task.due_date,
       comments: task.comments || []
     }));
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       company: taskData.company,
       week: taskData.week,
       status: taskData.status || 'todo',
-      assignee: taskData.assignee || null,
+      assignees: taskData.assignees || [],
       due_date: taskData.dueDate,
       comments: []
     };
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       company: data.company,
       week: data.week,
       status: data.status,
-      assignee: data.assignee,
+      assignees: data.assignees || [],
       dueDate: data.due_date,
       comments: data.comments || []
     });

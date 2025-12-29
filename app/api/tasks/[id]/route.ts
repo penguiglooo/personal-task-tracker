@@ -15,7 +15,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { data: task } = await supabaseAdmin.from('tasks').select('*').eq('task_id', id).single();
     if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
 
-    if (userRole === 'viewer' && task.assignee !== userName) {
+    if (userRole === 'viewer' && (!task.assignees || !task.assignees.includes(userName))) {
       return NextResponse.json({ error: 'You can only view tasks assigned to you' }, { status: 403 });
     }
 
@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (updates.title) updateData.title = updates.title;
     if (updates.company) updateData.company = updates.company;
     if (updates.status) updateData.status = updates.status;
-    if (updates.assignee !== undefined) updateData.assignee = updates.assignee;
+    if (updates.assignees !== undefined) updateData.assignees = updates.assignees;
     if (updates.dueDate) updateData.due_date = updates.dueDate;
     if (updates.week) updateData.week = updates.week;
     if (updates.comments) updateData.comments = updates.comments;
@@ -43,7 +43,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       company: updated.company,
       week: updated.week,
       status: updated.status,
-      assignee: updated.assignee,
+      assignees: updated.assignees || [],
       dueDate: updated.due_date,
       comments: updated.comments || []
     });

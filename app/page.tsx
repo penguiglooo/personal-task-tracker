@@ -19,7 +19,7 @@ interface Task {
   company: 'Muncho' | 'Foan' | 'Both';
   week: number;
   status: 'todo' | 'inProgress' | 'review' | 'done';
-  assignee: string | null;
+  assignees: string[];
   dueDate: string;
   comments: Comment[];
 }
@@ -65,8 +65,10 @@ export default function DashboardPage() {
     // Apply user filter for admins
     if (userFilter === 'all') {
       setFilteredTasks(tasks);
+    } else if (userFilter === 'null') {
+      setFilteredTasks(tasks.filter(task => !task.assignees || task.assignees.length === 0));
     } else {
-      setFilteredTasks(tasks.filter(task => task.assignee === userFilter));
+      setFilteredTasks(tasks.filter(task => task.assignees && task.assignees.includes(userFilter)));
     }
   }, [userFilter, tasks]);
 
@@ -148,7 +150,7 @@ export default function DashboardPage() {
       company: 'Muncho',
       week: weekNum,
       status: status as any,
-      assignee: null,
+      assignees: [],
       dueDate: getDefaultDateForWeek(weekNum),
     };
 
@@ -333,7 +335,7 @@ export default function DashboardPage() {
               {TEAM_MEMBERS.map(member => (
                 <option key={member} value={member}>{member}</option>
               ))}
-              <option value={null as any}>Unassigned</option>
+              <option value="null">Unassigned</option>
             </select>
           </div>
         )}
@@ -424,8 +426,10 @@ function TaskCard({
         }`}>
           {task.company}
         </span>
-        {task.assignee && (
-          <span className="bg-gray-100 px-2 py-1 rounded">{task.assignee}</span>
+        {task.assignees && task.assignees.length > 0 && (
+          <span className="bg-gray-100 px-2 py-1 rounded text-xs">
+            {task.assignees.join(', ')}
+          </span>
         )}
       </div>
       {task.comments.length > 0 && (
@@ -657,18 +661,26 @@ function TaskModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Assignee</label>
-              <select
-                value={editedTask.assignee || ''}
-                onChange={(e) => setEditedTask({...editedTask, assignee: e.target.value || null})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
-                disabled={!isAdmin}
-              >
-                <option value="">Unassigned</option>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Assignees</label>
+              <div className="space-y-2">
                 {TEAM_MEMBERS.map(member => (
-                  <option key={member} value={member}>{member}</option>
+                  <label key={member} className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editedTask.assignees?.includes(member) || false}
+                      onChange={(e) => {
+                        const newAssignees = e.target.checked
+                          ? [...(editedTask.assignees || []), member]
+                          : (editedTask.assignees || []).filter(a => a !== member);
+                        setEditedTask({...editedTask, assignees: newAssignees});
+                      }}
+                      disabled={!isAdmin}
+                      className="w-4 h-4 text-gray-800 border-gray-300 rounded focus:ring-gray-800"
+                    />
+                    <span className="text-sm text-gray-700">{member}</span>
+                  </label>
                 ))}
-              </select>
+              </div>
             </div>
 
             <div>

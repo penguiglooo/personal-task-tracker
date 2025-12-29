@@ -362,7 +362,12 @@ export default function DashboardPage() {
 
         <div className="mb-6">
           {view === 'calendar' ? (
-            <CalendarView tasks={filteredTasks} onTaskClick={setSelectedTask} />
+            <CalendarView
+              tasks={filteredTasks}
+              onTaskClick={setSelectedTask}
+              onTaskDrop={updateTask}
+              isAdmin={isAdmin}
+            />
           ) : (
             renderKanban(parseInt(view.replace('week', '')))
           )}
@@ -428,7 +433,17 @@ function TaskCard({
   );
 }
 
-function CalendarView({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (task: Task) => void }) {
+function CalendarView({
+  tasks,
+  onTaskClick,
+  onTaskDrop,
+  isAdmin
+}: {
+  tasks: Task[];
+  onTaskClick: (task: Task) => void;
+  onTaskDrop: (taskId: string, updates: Partial<Task>) => void;
+  isAdmin: boolean;
+}) {
   type DateObj = { month: number; day: number; year: number };
   const calendarDays: DateObj[] = [];
 
@@ -451,6 +466,38 @@ function CalendarView({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (tas
     }
   });
 
+  const handleTaskDragStart = (e: React.DragEvent, task: Task) => {
+    if (!isAdmin) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.setData('taskId', task.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDayDragOver = (e: React.DragEvent) => {
+    if (!isAdmin) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDayDrop = (e: React.DragEvent, dateStr: string) => {
+    if (!isAdmin) return;
+    e.preventDefault();
+    const taskId = e.dataTransfer.getData('taskId');
+    if (taskId) {
+      const date = new Date(dateStr);
+      const day = date.getDate();
+      let week = 1;
+      if (day <= 7) week = 1;
+      else if (day <= 15) week = 2;
+      else if (day <= 23) week = 3;
+      else week = 4;
+
+      onTaskDrop(taskId, { dueDate: dateStr, week });
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg p-6">
       <h2 className="text-2xl font-bold mb-6">December 2024 - January 2025</h2>
@@ -470,6 +517,8 @@ function CalendarView({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (tas
               <div
                 key={`${weekIdx}-${dayIdx}`}
                 className={`min-h-24 p-2 border rounded ${isDecember ? 'bg-gray-50' : 'bg-white hover:bg-gray-50'}`}
+                onDragOver={handleDayDragOver}
+                onDrop={(e) => handleDayDrop(e, dateStr)}
               >
                 <div className={`font-semibold mb-1 ${isDecember ? 'text-gray-400' : ''}`}>
                   {dateObj.day} {isDecember ? 'Dec' : ''}
@@ -478,11 +527,13 @@ function CalendarView({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (tas
                   {dayTasks.map(task => (
                     <div
                       key={task.id}
+                      draggable={isAdmin}
+                      onDragStart={(e) => handleTaskDragStart(e, task)}
                       className={`text-xs p-1 rounded cursor-pointer ${
                         task.company === 'Muncho' ? 'bg-blue-100 text-blue-800' :
                         task.company === 'Foan' ? 'bg-green-100 text-green-800' :
                         'bg-purple-100 text-purple-800'
-                      }`}
+                      } ${isAdmin ? 'cursor-move' : ''}`}
                       onClick={() => onTaskClick(task)}
                     >
                       {task.title}

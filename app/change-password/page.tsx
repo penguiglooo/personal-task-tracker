@@ -47,16 +47,17 @@ export default function ChangePasswordPage() {
 
       if (!response.ok) {
         setError(data.error || 'Failed to change password');
+        setLoading(false);
         return;
       }
 
       // Update session to reflect password change
-      await update();
+      await update({ mustChangePassword: false });
 
-      router.push('/');
+      // Force redirect to home page
+      window.location.href = '/';
     } catch (err) {
       setError('An error occurred');
-    } finally {
       setLoading(false);
     }
   };
@@ -85,7 +86,7 @@ export default function ChangePasswordPage() {
               id="newPassword"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-800 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-800 focus:border-transparent text-gray-900"
               required
               autoFocus
               minLength={6}
@@ -102,7 +103,7 @@ export default function ChangePasswordPage() {
               id="confirmPassword"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-800 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-800 focus:border-transparent text-gray-900"
               required
               minLength={6}
             />

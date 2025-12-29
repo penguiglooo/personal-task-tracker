@@ -42,6 +42,8 @@ export default function DashboardPage() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const [userFilter, setUserFilter] = useState<string>('all');
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [newTaskStatus, setNewTaskStatus] = useState<string>('todo');
 
   const isAdmin = (session?.user as any)?.role === 'admin';
 
@@ -136,6 +138,46 @@ export default function DashboardPage() {
     }
   };
 
+  const createTask = async (weekNum: number, status: string) => {
+    const newTask: Partial<Task> = {
+      title: '',
+      company: 'Muncho',
+      week: weekNum,
+      status: status as any,
+      assignee: null,
+      dueDate: getDefaultDateForWeek(weekNum),
+    };
+
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newTask),
+      });
+
+      if (response.ok) {
+        const createdTask = await response.json();
+        await fetchTasks();
+        setSelectedTask(createdTask);
+        setIsCreatingTask(false);
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to create task');
+      }
+    } catch (error) {
+      console.error('Failed to create task:', error);
+      alert('Failed to create task');
+    }
+  };
+
+  const getDefaultDateForWeek = (weekNum: number) => {
+    const startDays = [1, 8, 16, 24];
+    const day = startDays[weekNum - 1];
+    return `2025-01-${String(day).padStart(2, '0')}`;
+  };
+
   const handleDragStart = (e: React.DragEvent, task: Task) => {
     if (!isAdmin) {
       e.preventDefault();
@@ -180,12 +222,23 @@ export default function DashboardPage() {
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, status)}
           >
-            <h3 className="font-bold text-gray-700 mb-4 text-lg">
-              {STATUS_LABELS[status]}
-              <span className="ml-2 text-sm text-gray-500">
-                ({weekTasks.filter(t => t.status === status).length})
-              </span>
-            </h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-gray-700 text-lg">
+                {STATUS_LABELS[status]}
+                <span className="ml-2 text-sm text-gray-500">
+                  ({weekTasks.filter(t => t.status === status).length})
+                </span>
+              </h3>
+              {isAdmin && (
+                <button
+                  onClick={() => createTask(weekNum, status)}
+                  className="w-6 h-6 flex items-center justify-center bg-gray-800 text-white rounded hover:bg-gray-900 text-lg font-bold"
+                  title="Add new task"
+                >
+                  +
+                </button>
+              )}
+            </div>
             <div className="space-y-3">
               {weekTasks.filter(t => t.status === status).map(task => (
                 <TaskCard
@@ -242,7 +295,7 @@ export default function DashboardPage() {
             <select
               value={userFilter}
               onChange={(e) => setUserFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-800"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-800 text-gray-900"
             >
               <option value="all">All Team Members</option>
               {TEAM_MEMBERS.map(member => (
@@ -475,7 +528,7 @@ function TaskModal({
                 type="text"
                 value={editedTask.title}
                 onChange={(e) => setEditedTask({...editedTask, title: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
                 disabled={!isAdmin}
               />
             </div>
@@ -485,7 +538,7 @@ function TaskModal({
               <select
                 value={editedTask.company}
                 onChange={(e) => setEditedTask({...editedTask, company: e.target.value as any})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
                 disabled={!isAdmin}
               >
                 <option value="Muncho">Muncho</option>
@@ -499,7 +552,7 @@ function TaskModal({
               <select
                 value={editedTask.status}
                 onChange={(e) => setEditedTask({...editedTask, status: e.target.value as any})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
                 disabled={!isAdmin}
               >
                 <option value="todo">To Do</option>
@@ -514,7 +567,7 @@ function TaskModal({
               <select
                 value={editedTask.assignee || ''}
                 onChange={(e) => setEditedTask({...editedTask, assignee: e.target.value || null})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
                 disabled={!isAdmin}
               >
                 <option value="">Unassigned</option>
@@ -533,7 +586,7 @@ function TaskModal({
                   const newWeek = getWeekFromDate(e.target.value);
                   setEditedTask({...editedTask, dueDate: e.target.value, week: newWeek});
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
                 disabled={!isAdmin}
               />
               <div className="mt-1 text-xs text-gray-500">
@@ -563,7 +616,7 @@ function TaskModal({
                   onChange={(e) => setNewComment(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
                   placeholder="Add a comment..."
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
                 />
                 <button
                   onClick={handleAddComment}

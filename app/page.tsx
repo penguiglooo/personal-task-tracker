@@ -26,7 +26,7 @@ interface Task {
   createdAt: string;
 }
 
-const TEAM_MEMBERS = ['Dhruv', 'Akaash', 'Swapnil', 'Sneha', 'Aniket'];
+const TEAM_MEMBERS = ['Dhruv', 'Akaash', 'Swapnil', 'Sneha', 'Aniket', 'Saurabh'];
 const STATUS_COLUMNS = ['todo', 'inProgress', 'review', 'done'] as const;
 const STATUS_LABELS = {
   todo: 'To Do',

@@ -29,7 +29,9 @@ export async function GET(request: NextRequest) {
       status: task.status,
       assignees: task.assignees || [],
       dueDate: task.due_date,
-      comments: task.comments || []
+      comments: task.comments || [],
+      isBacklog: task.is_backlog || task.week === null,
+      createdAt: task.created_at || task.due_date
     }));
 
     return NextResponse.json(formattedTasks);
@@ -55,7 +57,9 @@ export async function POST(request: NextRequest) {
       status: taskData.status || 'todo',
       assignees: taskData.assignees || [],
       due_date: taskData.dueDate,
-      comments: []
+      comments: [],
+      is_backlog: taskData.isBacklog || taskData.week === null,
+      created_at: taskData.createdAt || new Date().toISOString()
     };
 
     const { data, error } = await supabaseAdmin.from('tasks').insert([newTask]).select().single();
@@ -72,7 +76,9 @@ export async function POST(request: NextRequest) {
       status: data.status,
       assignees: data.assignees || [],
       dueDate: data.due_date,
-      comments: data.comments || []
+      comments: data.comments || [],
+      isBacklog: data.is_backlog || data.week === null,
+      createdAt: data.created_at
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

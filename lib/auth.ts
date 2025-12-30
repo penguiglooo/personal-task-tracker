@@ -43,11 +43,17 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.role = (user as any).role;
         token.mustChangePassword = (user as any).mustChangePassword;
+      }
+      // Handle session updates (e.g., password changes)
+      if (trigger === 'update' && session) {
+        if (session.mustChangePassword !== undefined) {
+          token.mustChangePassword = session.mustChangePassword;
+        }
       }
       return token;
     },

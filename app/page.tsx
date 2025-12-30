@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
@@ -17,11 +17,13 @@ interface Task {
   id: string;
   title: string;
   company: 'Muncho' | 'Foan' | 'Both';
-  week: number;
+  week: number | null;
   status: 'todo' | 'inProgress' | 'review' | 'done';
   assignees: string[];
   dueDate: string;
   comments: Comment[];
+  isBacklog?: boolean;
+  createdAt: string;
 }
 
 const TEAM_MEMBERS = ['Dhruv', 'Akaash', 'Swapnil', 'Sneha', 'Aniket'];
@@ -67,6 +69,11 @@ export default function DashboardPage() {
       setFilteredTasks(tasks);
     } else if (userFilter === 'null') {
       setFilteredTasks(tasks.filter(task => !task.assignees || task.assignees.length === 0));
+    } else if (userFilter === 'kings') {
+      const kings = ['Dhruv', 'Swapnil', 'Akaash'];
+      setFilteredTasks(tasks.filter(task =>
+        task.assignees && task.assignees.some(assignee => kings.includes(assignee))
+      ));
     } else {
       setFilteredTasks(tasks.filter(task => task.assignees && task.assignees.includes(userFilter)));
     }
@@ -128,12 +135,18 @@ export default function DashboardPage() {
       });
 
       if (response.ok) {
-        await fetchTasks();
-        // Refresh the selected task
-        const task = tasks.find(t => t.id === taskId);
-        if (task) {
-          setSelectedTask(task);
+        const newComment = await response.json();
+
+        // Optimistically update the selected task immediately
+        if (selectedTask && selectedTask.id === taskId) {
+          setSelectedTask({
+            ...selectedTask,
+            comments: [...selectedTask.comments, newComment]
+          });
         }
+
+        // Also fetch all tasks to update the main state
+        await fetchTasks();
       } else {
         const error = await response.json();
         alert(error.error || 'Failed to add comment');
@@ -144,14 +157,16 @@ export default function DashboardPage() {
     }
   };
 
-  const createTask = async (weekNum: number, status: string) => {
+  const createTask = async (weekNum: number | null, status: string) => {
     const newTask: Partial<Task> = {
       title: '',
       company: 'Muncho',
       week: weekNum,
       status: status as any,
       assignees: [],
-      dueDate: getDefaultDateForWeek(weekNum),
+      dueDate: weekNum === null ? new Date().toISOString().split('T')[0] : getDefaultDateForWeek(weekNum),
+      isBacklog: weekNum === null,
+      createdAt: new Date().toISOString(),
     };
 
     try {
@@ -208,7 +223,7 @@ export default function DashboardPage() {
   };
 
   const canDeleteTask = (taskId: string) => {
-    const ORIGINAL_TASK_IDS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24'];
+    const ORIGINAL_TASK_IDS = Array.from({length: 42}, (_, i) => String(i + 1));
     return !ORIGINAL_TASK_IDS.includes(taskId);
   };
 
@@ -218,6 +233,7 @@ export default function DashboardPage() {
       return;
     }
     e.dataTransfer.setData('taskId', task.id);
+    e.dataTransfer.setData('currentStatus', task.status);
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -234,6 +250,51 @@ export default function DashboardPage() {
     }
   };
 
+  const handleCardDragOver = (e: React.DragEvent, targetTask: Task) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleCardDrop = async (e: React.DragEvent, targetTask: Task) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const draggedTaskId = e.dataTransfer.getData('taskId');
+    const currentStatus = e.dataTransfer.getData('currentStatus');
+
+    if (!draggedTaskId || !isAdmin || draggedTaskId === targetTask.id) {
+      return;
+    }
+
+    // If dragging within the same column, reorder the tasks
+    if (currentStatus === targetTask.status) {
+      const draggedTask = tasks.find(t => t.id === draggedTaskId);
+      if (!draggedTask) return;
+
+      // Get all tasks in this column
+      const columnTasks = filteredTasks.filter(t => t.status === targetTask.status);
+
+      // Remove dragged task and insert it before the target
+      const withoutDragged = columnTasks.filter(t => t.id !== draggedTaskId);
+      const targetIndex = withoutDragged.findIndex(t => t.id === targetTask.id);
+
+      // Reorder locally for immediate feedback
+      const reordered = [
+        ...withoutDragged.slice(0, targetIndex),
+        draggedTask,
+        ...withoutDragged.slice(targetIndex)
+      ];
+
+      // Update the tasks state with new order
+      const otherTasks = tasks.filter(t => t.status !== targetTask.status);
+      setTasks([...otherTasks, ...reordered]);
+    } else {
+      // Different status - change the status
+      await updateTask(draggedTaskId, { status: targetTask.status as any });
+    }
+  };
+
   const getWeekFromDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const day = date.getDate();
@@ -242,6 +303,63 @@ export default function DashboardPage() {
     if (day <= 15) return 2;
     if (day <= 23) return 3;
     return 4;
+  };
+
+  const renderBacklog = () => {
+    const backlogTasks = filteredTasks.filter(t => t.week === null || t.isBacklog);
+
+    return (
+      <div className="bg-purple-50 rounded-lg p-6 border-2 border-purple-200">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-purple-900 mb-2">📋 Backlog Tasks</h2>
+          <p className="text-purple-700 text-sm">
+            These are smaller tasks that can be picked up anytime. Assign them to a week to move them to the weekly board.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          {STATUS_COLUMNS.map(status => (
+            <div
+              key={status}
+              className="bg-white rounded-lg p-4 border border-purple-200"
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, status)}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-purple-700 text-lg">
+                  {STATUS_LABELS[status]}
+                  <span className="ml-2 text-sm text-purple-500">
+                    ({backlogTasks.filter(t => t.status === status).length})
+                  </span>
+                </h3>
+                {isAdmin && (
+                  <button
+                    onClick={() => createTask(null, status)}
+                    className="w-6 h-6 flex items-center justify-center bg-purple-600 text-white rounded hover:bg-purple-700 text-lg font-bold"
+                    title="Add new backlog task"
+                  >
+                    +
+                  </button>
+                )}
+              </div>
+              <div className="space-y-3">
+                {backlogTasks.filter(t => t.status === status).map(task => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onEdit={() => setSelectedTask(task)}
+                    onDragStart={handleDragStart}
+                    onDragOver={handleCardDragOver}
+                    onDrop={handleCardDrop}
+                    canDrag={isAdmin}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   const renderKanban = (weekNum: number) => {
@@ -280,6 +398,8 @@ export default function DashboardPage() {
                   task={task}
                   onEdit={() => setSelectedTask(task)}
                   onDragStart={handleDragStart}
+                  onDragOver={handleCardDragOver}
+                  onDrop={handleCardDrop}
                   canDrag={isAdmin}
                 />
               ))}
@@ -329,9 +449,10 @@ export default function DashboardPage() {
             <select
               value={userFilter}
               onChange={(e) => setUserFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-800 text-gray-900"
+              className="px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-800 text-gray-900"
             >
               <option value="all">All Team Members</option>
+              <option value="kings">Kings (Dhruv, Swapnil, Akaash)</option>
               {TEAM_MEMBERS.map(member => (
                 <option key={member} value={member}>{member}</option>
               ))}
@@ -350,6 +471,16 @@ export default function DashboardPage() {
             }`}
           >
             📅 Calendar
+          </button>
+          <button
+            onClick={() => setView('backlog')}
+            className={`px-4 py-2 rounded-lg font-medium ${
+              view === 'backlog'
+                ? 'bg-purple-600 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            📋 Backlog
           </button>
           {[1, 2, 3, 4].map(week => (
             <button
@@ -374,6 +505,8 @@ export default function DashboardPage() {
               onTaskDrop={updateTask}
               isAdmin={isAdmin}
             />
+          ) : view === 'backlog' ? (
+            renderBacklog()
           ) : (
             renderKanban(parseInt(view.replace('week', '')))
           )}
@@ -388,6 +521,7 @@ export default function DashboardPage() {
             onDelete={deleteTask}
             canDelete={canDeleteTask(selectedTask.id)}
             isAdmin={isAdmin}
+            getDefaultDateForWeek={getDefaultDateForWeek}
           />
         )}
       </div>
@@ -399,25 +533,54 @@ function TaskCard({
   task,
   onEdit,
   onDragStart,
+  onDragOver,
+  onDrop,
   canDrag
 }: {
   task: Task;
   onEdit: () => void;
   onDragStart: (e: React.DragEvent, task: Task) => void;
+  onDragOver?: (e: React.DragEvent, task: Task) => void;
+  onDrop?: (e: React.DragEvent, task: Task) => void;
   canDrag: boolean;
 }) {
+  const getCardAge = () => {
+    // Calculate days since card was created
+    const createdDate = new Date(task.createdAt);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    createdDate.setHours(0, 0, 0, 0);
+    const diffTime = today.getTime() - createdDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const cardAge = getCardAge();
+  const showAgeBadge = cardAge >= 0;
+
   return (
     <div
       draggable={canDrag}
       onDragStart={(e) => onDragStart(e, task)}
+      onDragOver={onDragOver ? (e) => onDragOver(e, task) : undefined}
+      onDrop={onDrop ? (e) => onDrop(e, task) : undefined}
       onClick={onEdit}
-      className={`bg-white p-3 rounded-lg shadow-sm border-l-4 cursor-pointer hover:shadow-md transition-shadow ${
+      className={`bg-white p-3 rounded-lg shadow-sm border-l-4 cursor-pointer hover:shadow-md transition-shadow relative ${
         task.company === 'Muncho' ? 'border-blue-500' :
         task.company === 'Foan' ? 'border-green-500' :
         'border-purple-500'
       } ${!canDrag ? 'cursor-default' : ''}`}
     >
-      <div className="font-medium text-gray-900 mb-2">{task.title}</div>
+      {showAgeBadge && (
+        <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-semibold ${
+          cardAge <= 3 ? 'bg-yellow-100 text-yellow-800' :
+          cardAge <= 7 ? 'bg-orange-100 text-orange-800' :
+          'bg-red-100 text-red-800'
+        }`}>
+          {cardAge}d
+        </div>
+      )}
+      <div className="font-medium text-gray-900 mb-2 pr-12">{task.title}</div>
       <div className="flex items-center justify-between text-xs text-gray-600">
         <span className={`px-2 py-1 rounded ${
           task.company === 'Muncho' ? 'bg-blue-100 text-blue-800' :
@@ -564,7 +727,8 @@ function TaskModal({
   onAddComment,
   onDelete,
   canDelete,
-  isAdmin
+  isAdmin,
+  getDefaultDateForWeek
 }: {
   task: Task;
   onClose: () => void;
@@ -573,14 +737,38 @@ function TaskModal({
   onDelete: (taskId: string) => void;
   canDelete: boolean;
   isAdmin: boolean;
+  getDefaultDateForWeek: (weekNum: number) => string;
 }) {
   const [editedTask, setEditedTask] = useState(task);
   const [newComment, setNewComment] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [showMemberDropdown, setShowMemberDropdown] = useState(false);
+  const commentsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setEditedTask(task);
   }, [task]);
+
+  // Auto-scroll to latest comment
+  useEffect(() => {
+    if (commentsEndRef.current) {
+      commentsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [editedTask.comments]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.member-dropdown-container')) {
+        setShowMemberDropdown(false);
+      }
+    };
+
+    if (showMemberDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showMemberDropdown]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -591,10 +779,27 @@ function TaskModal({
     }
   };
 
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     if (newComment.trim()) {
-      onAddComment(task.id, newComment);
+      const commentText = newComment.trim();
       setNewComment('');
+
+      // Optimistically add the comment to local state immediately
+      const optimisticComment = {
+        id: Date.now().toString(),
+        text: commentText,
+        timestamp: new Date().toISOString(),
+        userId: 'temp',
+        userName: editedTask.comments[editedTask.comments.length - 1]?.userName || 'You'
+      };
+
+      setEditedTask({
+        ...editedTask,
+        comments: [...editedTask.comments, optimisticComment]
+      });
+
+      // Then call the API
+      onAddComment(task.id, commentText);
     }
   };
 
@@ -661,25 +866,91 @@ function TaskModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Assignees</label>
-              <div className="space-y-2">
-                {TEAM_MEMBERS.map(member => (
-                  <label key={member} className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={editedTask.assignees?.includes(member) || false}
-                      onChange={(e) => {
-                        const newAssignees = e.target.checked
-                          ? [...(editedTask.assignees || []), member]
-                          : (editedTask.assignees || []).filter(a => a !== member);
-                        setEditedTask({...editedTask, assignees: newAssignees});
-                      }}
-                      disabled={!isAdmin}
-                      className="w-4 h-4 text-gray-800 border-gray-300 rounded focus:ring-gray-800"
-                    />
-                    <span className="text-sm text-gray-700">{member}</span>
-                  </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Week Assignment</label>
+              <select
+                value={editedTask.week === null ? 'backlog' : editedTask.week.toString()}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === 'backlog') {
+                    const newWeek = null;
+                    setEditedTask({...editedTask, week: newWeek, isBacklog: true});
+                  } else {
+                    const newWeek = parseInt(value);
+                    const newDueDate = getWeekFromDate(editedTask.dueDate) !== newWeek
+                      ? getDefaultDateForWeek(newWeek)
+                      : editedTask.dueDate;
+                    setEditedTask({...editedTask, week: newWeek, dueDate: newDueDate, isBacklog: false});
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                disabled={!isAdmin}
+              >
+                <option value="backlog">Backlog (No Week)</option>
+                <option value="1">Week 1 (Jan 1-7)</option>
+                <option value="2">Week 2 (Jan 8-15)</option>
+                <option value="3">Week 3 (Jan 16-23)</option>
+                <option value="4">Week 4 (Jan 24-31)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Members</label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {editedTask.assignees?.map(member => (
+                  <div key={member} className="flex items-center gap-1 bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">
+                    <span className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-semibold">
+                      {member.charAt(0)}
+                    </span>
+                    <span>{member}</span>
+                    {isAdmin && (
+                      <button
+                        onClick={() => {
+                          const newAssignees = editedTask.assignees.filter(a => a !== member);
+                          setEditedTask({...editedTask, assignees: newAssignees});
+                        }}
+                        className="ml-1 text-gray-500 hover:text-gray-700 font-bold"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                 ))}
+                {isAdmin && (
+                  <div className="relative member-dropdown-container">
+                    <button
+                      onClick={() => setShowMemberDropdown(!showMemberDropdown)}
+                      className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600 text-xl font-bold"
+                    >
+                      +
+                    </button>
+                    {showMemberDropdown && (
+                      <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 min-w-[200px]">
+                        <div className="p-2">
+                          <div className="text-xs font-semibold text-gray-600 px-2 py-1">TEAM MEMBERS</div>
+                          {TEAM_MEMBERS.filter(member => !editedTask.assignees?.includes(member)).map(member => (
+                            <button
+                              key={member}
+                              onClick={() => {
+                                const newAssignees = [...(editedTask.assignees || []), member];
+                                setEditedTask({...editedTask, assignees: newAssignees});
+                                setShowMemberDropdown(false);
+                              }}
+                              className="w-full flex items-center gap-2 px-2 py-2 hover:bg-gray-100 rounded text-sm text-left"
+                            >
+                              <span className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-semibold">
+                                {member.charAt(0)}
+                              </span>
+                              <span className="text-gray-800">{member}</span>
+                            </button>
+                          ))}
+                          {TEAM_MEMBERS.filter(member => !editedTask.assignees?.includes(member)).length === 0 && (
+                            <div className="px-2 py-2 text-sm text-gray-500">All members assigned</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -714,6 +985,7 @@ function TaskModal({
                     <div className="text-sm text-gray-700">{comment.text}</div>
                   </div>
                 ))}
+                <div ref={commentsEndRef} />
               </div>
               <div className="flex gap-2">
                 <input

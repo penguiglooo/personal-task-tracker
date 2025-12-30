@@ -30,7 +30,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (updates.status) updateData.status = updates.status;
     if (updates.assignees !== undefined) updateData.assignees = updates.assignees;
     if (updates.dueDate) updateData.due_date = updates.dueDate;
-    if (updates.week) updateData.week = updates.week;
+    if (updates.week !== undefined) {
+      updateData.week = updates.week;
+      updateData.is_backlog = updates.week === null || updates.isBacklog;
+    }
+    if (updates.isBacklog !== undefined) updateData.is_backlog = updates.isBacklog;
     if (updates.comments) updateData.comments = updates.comments;
 
     const { data: updated, error } = await supabaseAdmin.from('tasks').update(updateData).eq('task_id', id).select().single();
@@ -45,7 +49,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       status: updated.status,
       assignees: updated.assignees || [],
       dueDate: updated.due_date,
-      comments: updated.comments || []
+      comments: updated.comments || [],
+      isBacklog: updated.is_backlog || updated.week === null,
+      createdAt: updated.created_at || updated.due_date
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -60,8 +66,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const { id } = await params;
 
-    // Prevent deletion of original tasks (task IDs 1-24)
-    const ORIGINAL_TASK_IDS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24'];
+    // Prevent deletion of original tasks (task IDs 1-42)
+    const ORIGINAL_TASK_IDS = Array.from({length: 42}, (_, i) => String(i + 1));
     if (ORIGINAL_TASK_IDS.includes(id)) {
       return NextResponse.json({ error: 'Cannot delete original tasks' }, { status: 403 });
     }

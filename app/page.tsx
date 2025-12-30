@@ -46,6 +46,10 @@ export default function DashboardPage() {
   const [userFilter, setUserFilter] = useState<string>('all');
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [newTaskStatus, setNewTaskStatus] = useState<string>('todo');
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
 
   const isAdmin = (session?.user as any)?.role === 'admin';
 
@@ -225,6 +229,37 @@ export default function DashboardPage() {
   const canDeleteTask = (taskId: string) => {
     const ORIGINAL_TASK_IDS = Array.from({length: 42}, (_, i) => String(i + 1));
     return !ORIGINAL_TASK_IDS.includes(taskId);
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetEmail || !resetNewPassword) {
+      alert('Please enter email and new password');
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const response = await fetch('/api/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail, newPassword: resetNewPassword })
+      });
+
+      if (response.ok) {
+        alert(`Password reset successfully for ${resetEmail}`);
+        setShowResetPassword(false);
+        setResetEmail('');
+        setResetNewPassword('');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to reset password');
+      }
+    } catch (error) {
+      console.error('Failed to reset password:', error);
+      alert('Failed to reset password');
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   const handleDragStart = (e: React.DragEvent, task: Task) => {
@@ -433,12 +468,22 @@ export default function DashboardPage() {
               Logged in as {session?.user?.name} ({isAdmin ? 'Admin' : 'Viewer'})
             </p>
           </div>
-          <button
-            onClick={() => signOut({ callbackUrl: '/login' })}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-          >
-            Sign Out
-          </button>
+          <div className="flex gap-2">
+            {isAdmin && (
+              <button
+                onClick={() => setShowResetPassword(true)}
+                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
+              >
+                Reset Password
+              </button>
+            )}
+            <button
+              onClick={() => signOut({ callbackUrl: '/login' })}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            >
+              Sign Out
+            </button>
+          </div>
         </header>
 
         {isAdmin && (
@@ -523,6 +568,83 @@ export default function DashboardPage() {
             isAdmin={isAdmin}
             getDefaultDateForWeek={getDefaultDateForWeek}
           />
+        )}
+
+        {showResetPassword && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h2 className="text-2xl font-bold text-gray-900">Reset User Password</h2>
+                <button
+                  onClick={() => {
+                    setShowResetPassword(false);
+                    setResetEmail('');
+                    setResetNewPassword('');
+                  }}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    User Email
+                  </label>
+                  <select
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                  >
+                    <option value="">Select user...</option>
+                    <option value="aniket.jadhav@muncho.in">Aniket (aniket.jadhav@muncho.in)</option>
+                    <option value="sneha.kumar@muncho.in">Sneha (sneha.kumar@muncho.in)</option>
+                    <option value="akaash@muncho.app">Akaash (akaash@muncho.app)</option>
+                    <option value="swapnil.sinha@muncho.in">Swapnil (swapnil.sinha@muncho.in)</option>
+                    <option value="dhruv@muncho.in">Dhruv (dhruv@muncho.in)</option>
+                    <option value="saurabh@foan.ai">Saurabh (saurabh@foan.ai)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    New Password
+                  </label>
+                  <input
+                    type="text"
+                    value={resetNewPassword}
+                    onChange={(e) => setResetNewPassword(e.target.value)}
+                    placeholder="Enter new password"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    User will be required to change this password on next login
+                  </p>
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <button
+                    onClick={handleResetPassword}
+                    disabled={resetLoading}
+                    className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    {resetLoading ? 'Resetting...' : 'Reset Password'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowResetPassword(false);
+                      setResetEmail('');
+                      setResetNewPassword('');
+                    }}
+                    className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

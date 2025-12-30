@@ -12,6 +12,13 @@ interface Comment {
   userName: string;
 }
 
+interface Subtask {
+  id: string;
+  text: string;
+  completed: boolean;
+  assignee: string | null;
+}
+
 interface Task {
   _id: string;
   id: string;
@@ -22,6 +29,7 @@ interface Task {
   assignees: string[];
   dueDate: string;
   comments: Comment[];
+  subtasks?: Subtask[];
   isBacklog?: boolean;
   createdAt: string;
 }
@@ -472,14 +480,14 @@ export default function DashboardPage() {
             {isAdmin && (
               <button
                 onClick={() => setShowResetPassword(true)}
-                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
+                className="px-4 py-2 bg-white text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-100"
               >
                 Reset Password
               </button>
             )}
             <button
               onClick={() => signOut({ callbackUrl: '/login' })}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900"
             >
               Sign Out
             </button>
@@ -722,6 +730,20 @@ function TaskCard({
           💬 {task.comments.length} comment{task.comments.length !== 1 ? 's' : ''}
         </div>
       )}
+      {task.subtasks && task.subtasks.length > 0 && (
+        <div className="mt-2">
+          <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+            <span>{task.subtasks.filter(st => st.completed).length}/{task.subtasks.length} subtasks</span>
+            <span>{Math.round((task.subtasks.filter(st => st.completed).length / task.subtasks.length) * 100)}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-gray-800 h-2 rounded-full transition-all"
+              style={{ width: `${(task.subtasks.filter(st => st.completed).length / task.subtasks.length) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -865,6 +887,7 @@ function TaskModal({
   const [newComment, setNewComment] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
+  const [newSubtask, setNewSubtask] = useState('');
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -923,6 +946,47 @@ function TaskModal({
       // Then call the API
       onAddComment(task.id, commentText);
     }
+  };
+
+  const handleAddSubtask = () => {
+    if (newSubtask.trim()) {
+      const newSubtaskObj: Subtask = {
+        id: Date.now().toString(),
+        text: newSubtask.trim(),
+        completed: false,
+        assignee: null
+      };
+      setEditedTask({
+        ...editedTask,
+        subtasks: [...(editedTask.subtasks || []), newSubtaskObj]
+      });
+      setNewSubtask('');
+    }
+  };
+
+  const handleToggleSubtask = (subtaskId: string) => {
+    setEditedTask({
+      ...editedTask,
+      subtasks: editedTask.subtasks?.map(st =>
+        st.id === subtaskId ? { ...st, completed: !st.completed } : st
+      )
+    });
+  };
+
+  const handleAssignSubtask = (subtaskId: string, assignee: string | null) => {
+    setEditedTask({
+      ...editedTask,
+      subtasks: editedTask.subtasks?.map(st =>
+        st.id === subtaskId ? { ...st, assignee } : st
+      )
+    });
+  };
+
+  const handleDeleteSubtask = (subtaskId: string) => {
+    setEditedTask({
+      ...editedTask,
+      subtasks: editedTask.subtasks?.filter(st => st.id !== subtaskId)
+    });
   };
 
   const getWeekFromDate = (dateStr: string) => {
@@ -1090,6 +1154,72 @@ function TaskModal({
               />
               <div className="mt-1 text-xs text-gray-500">
                 This task will appear in Week {editedTask.week}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Subtasks</label>
+              <div className="space-y-2 mb-3">
+                {editedTask.subtasks && editedTask.subtasks.length > 0 && (
+                  <div className="mb-3">
+                    {editedTask.subtasks.map(subtask => (
+                      <div key={subtask.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded mb-2">
+                        <input
+                          type="checkbox"
+                          checked={subtask.completed}
+                          onChange={() => handleToggleSubtask(subtask.id)}
+                          className="w-4 h-4 text-gray-800 border-gray-300 rounded focus:ring-gray-800"
+                        />
+                        <span className={`flex-1 text-sm ${subtask.completed ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                          {subtask.text}
+                        </span>
+                        {isAdmin && (
+                          <>
+                            <select
+                              value={subtask.assignee || ''}
+                              onChange={(e) => handleAssignSubtask(subtask.id, e.target.value || null)}
+                              className="text-xs px-2 py-1 border border-gray-300 rounded"
+                            >
+                              <option value="">Unassigned</option>
+                              {TEAM_MEMBERS.map(member => (
+                                <option key={member} value={member}>{member}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => handleDeleteSubtask(subtask.id)}
+                              className="text-red-600 hover:text-red-800 text-sm font-bold"
+                            >
+                              ×
+                            </button>
+                          </>
+                        )}
+                        {!isAdmin && subtask.assignee && (
+                          <span className="text-xs text-gray-600 bg-gray-200 px-2 py-1 rounded">
+                            {subtask.assignee}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {isAdmin && (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newSubtask}
+                      onChange={(e) => setNewSubtask(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddSubtask()}
+                      placeholder="Add a subtask..."
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                    />
+                    <button
+                      onClick={handleAddSubtask}
+                      className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900"
+                    >
+                      Add
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
       assignees: task.assignees || [],
       dueDate: task.due_date,
       comments: task.comments || [],
+      subtasks: task.subtasks || [],
       isBacklog: task.is_backlog || task.week === null,
       createdAt: task.created_at || task.due_date
     }));
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
       assignees: taskData.assignees || [],
       due_date: taskData.dueDate,
       comments: [],
+      subtasks: [],
       is_backlog: taskData.isBacklog || taskData.week === null,
       created_at: taskData.createdAt || new Date().toISOString()
     };
@@ -77,6 +79,7 @@ export async function POST(request: NextRequest) {
       assignees: data.assignees || [],
       dueDate: data.due_date,
       comments: data.comments || [],
+      subtasks: data.subtasks || [],
       isBacklog: data.is_backlog || data.week === null,
       createdAt: data.created_at
     });

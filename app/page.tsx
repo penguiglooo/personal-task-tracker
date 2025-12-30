@@ -1178,7 +1178,7 @@ function TaskModal({
                             <select
                               value={subtask.assignee || ''}
                               onChange={(e) => handleAssignSubtask(subtask.id, e.target.value || null)}
-                              className="text-xs px-2 py-1 border border-gray-300 rounded"
+                              className="text-xs px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white"
                             >
                               <option value="">Unassigned</option>
                               {TEAM_MEMBERS.map(member => (

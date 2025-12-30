@@ -285,7 +285,28 @@ export default function DashboardPage() {
     e.preventDefault();
     const taskId = e.dataTransfer.getData('taskId');
     if (taskId) {
-      await updateTask(taskId, { status: newStatus as any });
+      // Optimistically update UI immediately
+      const taskToUpdate = tasks.find(t => t.id === taskId);
+      if (taskToUpdate) {
+        setTasks(prev => prev.map(t =>
+          t.id === taskId ? { ...t, status: newStatus as any } : t
+        ));
+        setFilteredTasks(prev => prev.map(t =>
+          t.id === taskId ? { ...t, status: newStatus as any } : t
+        ));
+      }
+
+      // Then update in backend and revert if it fails
+      const success = await updateTask(taskId, { status: newStatus as any });
+      if (!success && taskToUpdate) {
+        // Revert on failure
+        setTasks(prev => prev.map(t =>
+          t.id === taskId ? taskToUpdate : t
+        ));
+        setFilteredTasks(prev => prev.map(t =>
+          t.id === taskId ? taskToUpdate : t
+        ));
+      }
     }
   };
 

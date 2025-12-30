@@ -15,22 +15,29 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { data: task } = await supabaseAdmin.from('tasks').select('*').eq('task_id', id).single();
     if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
 
-    if (userRole === 'viewer' && (!task.assignees || !task.assignees.includes(userName))) {
-      return NextResponse.json({ error: 'You can only view tasks assigned to you' }, { status: 403 });
-    }
-
     const updates = await request.json();
 
-    // Viewers can move tasks (change status) but cannot modify other fields
+    // Viewers can move tasks (change status) and update subtasks
     if (userRole === 'viewer') {
+      // Check if this is a task assigned to the viewer
+      const isAssignedToViewer = task.assignees && task.assignees.includes(userName);
+
       // Only allow status and subtasks updates for viewers
       const allowedUpdates = ['status', 'subtasks'];
       const updateKeys = Object.keys(updates);
       const hasDisallowedUpdates = updateKeys.some(key => !allowedUpdates.includes(key));
 
+      // If trying to update disallowed fields, block it
       if (hasDisallowedUpdates) {
         return NextResponse.json({ error: 'You can only move tasks and update subtasks' }, { status: 403 });
       }
+
+      // If updating subtasks, must be assigned to the task
+      if (updates.subtasks && !isAssignedToViewer) {
+        return NextResponse.json({ error: 'You can only update subtasks on tasks assigned to you' }, { status: 403 });
+      }
+
+      // Status updates are allowed for any task (for drag and drop)
     }
 
     const updateData: any = {};

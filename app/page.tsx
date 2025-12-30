@@ -271,10 +271,6 @@ export default function DashboardPage() {
   };
 
   const handleDragStart = (e: React.DragEvent, task: Task) => {
-    if (!isAdmin) {
-      e.preventDefault();
-      return;
-    }
     e.dataTransfer.setData('taskId', task.id);
     e.dataTransfer.setData('currentStatus', task.status);
     e.dataTransfer.effectAllowed = 'move';
@@ -394,7 +390,7 @@ export default function DashboardPage() {
                     onDragStart={handleDragStart}
                     onDragOver={handleCardDragOver}
                     onDrop={handleCardDrop}
-                    canDrag={isAdmin}
+                    canDrag={true}
                   />
                 ))}
               </div>
@@ -443,7 +439,7 @@ export default function DashboardPage() {
                   onDragStart={handleDragStart}
                   onDragOver={handleCardDragOver}
                   onDrop={handleCardDrop}
-                  canDrag={isAdmin}
+                  canDrag={true}
                 />
               ))}
             </div>

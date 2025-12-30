@@ -20,8 +20,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     const updates = await request.json();
-    if (userRole === 'viewer' && updates.status && updates.status !== task.status) {
-      return NextResponse.json({ error: 'You do not have permission to move tasks' }, { status: 403 });
+
+    // Viewers can move tasks (change status) but cannot modify other fields
+    if (userRole === 'viewer') {
+      // Only allow status and subtasks updates for viewers
+      const allowedUpdates = ['status', 'subtasks'];
+      const updateKeys = Object.keys(updates);
+      const hasDisallowedUpdates = updateKeys.some(key => !allowedUpdates.includes(key));
+
+      if (hasDisallowedUpdates) {
+        return NextResponse.json({ error: 'You can only move tasks and update subtasks' }, { status: 403 });
+      }
     }
 
     const updateData: any = {};

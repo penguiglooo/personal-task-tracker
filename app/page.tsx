@@ -284,7 +284,7 @@ export default function DashboardPage() {
   const handleDrop = async (e: React.DragEvent, newStatus: string) => {
     e.preventDefault();
     const taskId = e.dataTransfer.getData('taskId');
-    if (taskId && isAdmin) {
+    if (taskId) {
       await updateTask(taskId, { status: newStatus as any });
     }
   };
@@ -302,7 +302,7 @@ export default function DashboardPage() {
     const draggedTaskId = e.dataTransfer.getData('taskId');
     const currentStatus = e.dataTransfer.getData('currentStatus');
 
-    if (!draggedTaskId || !isAdmin || draggedTaskId === targetTask.id) {
+    if (!draggedTaskId || draggedTaskId === targetTask.id) {
       return;
     }
 

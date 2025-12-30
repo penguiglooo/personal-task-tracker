@@ -11,11 +11,14 @@ export async function GET(request: NextRequest) {
     const userRole = (session.user as any).role;
     const userName = session.user.name;
 
-    // All users can see all tasks (viewers can drag and drop any task)
-    const { data: tasks, error } = await supabaseAdmin
-      .from('tasks')
-      .select('*')
-      .order('due_date', { ascending: true });
+    let query = supabaseAdmin.from('tasks').select('*').order('due_date', { ascending: true });
+
+    // Viewers can only see tasks assigned to them
+    if (userRole === 'viewer') {
+      query = query.contains('assignees', [userName]);
+    }
+
+    const { data: tasks, error } = await query;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     
     const formattedTasks = tasks.map(task => ({

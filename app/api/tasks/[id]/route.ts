@@ -22,6 +22,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // Check if this is a task assigned to the viewer
       const isAssignedToViewer = task.assignees && task.assignees.includes(userName);
 
+      // Viewers can only update their assigned tasks
+      if (!isAssignedToViewer) {
+        return NextResponse.json({ error: 'You can only update tasks assigned to you' }, { status: 403 });
+      }
+
       // Only allow status and subtasks updates for viewers
       const allowedUpdates = ['status', 'subtasks'];
       const updateKeys = Object.keys(updates);
@@ -31,13 +36,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (hasDisallowedUpdates) {
         return NextResponse.json({ error: 'You can only move tasks and update subtasks' }, { status: 403 });
       }
-
-      // If updating subtasks, must be assigned to the task
-      if (updates.subtasks && !isAssignedToViewer) {
-        return NextResponse.json({ error: 'You can only update subtasks on tasks assigned to you' }, { status: 403 });
-      }
-
-      // Status updates are allowed for any task (for drag and drop)
     }
 
     const updateData: any = {};

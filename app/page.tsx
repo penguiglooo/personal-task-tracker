@@ -1012,57 +1012,63 @@ function WeekView({
                 <div className="text-sm font-medium text-gray-500">{dateObj.dayName}</div>
                 <div className="text-2xl font-bold text-gray-900">{dateObj.day}</div>
               </div>
-              <div className="space-y-2 flex-1">
+              <div className="space-y-3 flex-1 overflow-y-auto">
                 {dayTasks.map(task => (
                   <div
                     key={task.id}
                     draggable={isAdmin}
                     onDragStart={(e) => handleTaskDragStart(e, task)}
-                    className={`p-3 rounded-lg cursor-pointer border-l-4 shadow-sm hover:shadow-md transition-shadow ${
+                    className={`p-3 rounded-md cursor-pointer border-l-4 shadow-sm hover:shadow-md transition-all ${
                       task.company === 'Muncho' ? 'bg-blue-50 border-blue-500' :
                       task.company === 'Foan' ? 'bg-green-50 border-green-500' :
                       'bg-purple-50 border-purple-500'
                     } ${isAdmin ? 'cursor-move' : ''}`}
                     onClick={() => onTaskClick(task)}
                   >
-                    <div className="font-medium text-sm mb-2 text-gray-900">{task.title}</div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className={`px-2 py-1 rounded ${
-                        task.company === 'Muncho' ? 'bg-blue-100 text-blue-800' :
-                        task.company === 'Foan' ? 'bg-green-100 text-green-800' :
-                        'bg-purple-100 text-purple-800'
-                      }`}>
-                        {task.company}
-                      </span>
-                      <span className={`px-2 py-1 rounded ${
-                        task.status === 'done' ? 'bg-green-100 text-green-800' :
-                        task.status === 'review' ? 'bg-yellow-100 text-yellow-800' :
-                        task.status === 'inProgress' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {task.status === 'inProgress' ? 'In Progress' :
-                         task.status === 'todo' ? 'To Do' :
-                         task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-                      </span>
+                    <div className="font-semibold text-sm mb-3 text-gray-900 leading-snug">{task.title}</div>
+
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          task.company === 'Muncho' ? 'bg-blue-100 text-blue-800' :
+                          task.company === 'Foan' ? 'bg-green-100 text-green-800' :
+                          'bg-purple-100 text-purple-800'
+                        }`}>
+                          {task.company}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          task.status === 'done' ? 'bg-green-100 text-green-800' :
+                          task.status === 'review' ? 'bg-yellow-100 text-yellow-800' :
+                          task.status === 'inProgress' ? 'bg-blue-100 text-blue-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {task.status === 'inProgress' ? 'In Progress' :
+                           task.status === 'todo' ? 'To Do' :
+                           task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                        </span>
+                      </div>
+
+                      {task.assignees && task.assignees.length > 0 && (
+                        <div className="text-xs text-gray-700 bg-white bg-opacity-60 px-2 py-1 rounded">
+                          👤 {task.assignees.join(', ')}
+                        </div>
+                      )}
+
+                      {task.subtasks && task.subtasks.length > 0 && (
+                        <div className="pt-1">
+                          <div className="flex items-center justify-between text-xs text-gray-600 mb-1.5">
+                            <span className="font-medium">{task.subtasks.filter(st => st.completed).length}/{task.subtasks.length} subtasks</span>
+                            <span className="text-gray-500">{Math.round((task.subtasks.filter(st => st.completed).length / task.subtasks.length) * 100)}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5">
+                            <div
+                              className="bg-gray-800 h-1.5 rounded-full transition-all"
+                              style={{ width: `${(task.subtasks.filter(st => st.completed).length / task.subtasks.length) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    {task.assignees && task.assignees.length > 0 && (
-                      <div className="mt-2 text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                        {task.assignees.join(', ')}
-                      </div>
-                    )}
-                    {task.subtasks && task.subtasks.length > 0 && (
-                      <div className="mt-2">
-                        <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                          <span>{task.subtasks.filter(st => st.completed).length}/{task.subtasks.length} subtasks</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5">
-                          <div
-                            className="bg-gray-800 h-1.5 rounded-full transition-all"
-                            style={{ width: `${(task.subtasks.filter(st => st.completed).length / task.subtasks.length) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>

@@ -49,6 +49,8 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [view, setView] = useState('week1');
+  const [calendarViewMode, setCalendarViewMode] = useState<'month' | 'week'>('month');
+  const [selectedWeekForWeekView, setSelectedWeekForWeekView] = useState(1);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const [userFilter, setUserFilter] = useState<string>('all');
@@ -569,12 +571,63 @@ export default function DashboardPage() {
 
         <div className="mb-6">
           {view === 'calendar' ? (
-            <CalendarView
-              tasks={filteredTasks}
-              onTaskClick={setSelectedTask}
-              onTaskDrop={updateTask}
-              isAdmin={isAdmin}
-            />
+            <>
+              <div className="mb-4 bg-white rounded-lg p-4 shadow-sm flex items-center justify-between">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCalendarViewMode('month')}
+                    className={`px-4 py-2 rounded-lg font-medium ${
+                      calendarViewMode === 'month'
+                        ? 'bg-gray-800 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Month View
+                  </button>
+                  <button
+                    onClick={() => setCalendarViewMode('week')}
+                    className={`px-4 py-2 rounded-lg font-medium ${
+                      calendarViewMode === 'week'
+                        ? 'bg-gray-800 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Week View
+                  </button>
+                </div>
+                {calendarViewMode === 'week' && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">Select Week:</label>
+                    <select
+                      value={selectedWeekForWeekView}
+                      onChange={(e) => setSelectedWeekForWeekView(parseInt(e.target.value))}
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-800 text-gray-900"
+                    >
+                      <option value="1">Week 1 (Jan 1-7)</option>
+                      <option value="2">Week 2 (Jan 8-15)</option>
+                      <option value="3">Week 3 (Jan 16-23)</option>
+                      <option value="4">Week 4 (Jan 24-31)</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+              {calendarViewMode === 'month' ? (
+                <CalendarView
+                  tasks={filteredTasks}
+                  onTaskClick={setSelectedTask}
+                  onTaskDrop={updateTask}
+                  isAdmin={isAdmin}
+                />
+              ) : (
+                <WeekView
+                  tasks={filteredTasks}
+                  weekNumber={selectedWeekForWeekView}
+                  onTaskClick={setSelectedTask}
+                  onTaskDrop={updateTask}
+                  isAdmin={isAdmin}
+                />
+              )}
+            </>
           ) : view === 'backlog' ? (
             renderBacklog()
           ) : (
@@ -876,6 +929,146 @@ function CalendarView({
             );
           })
         )}
+      </div>
+    </div>
+  );
+}
+
+function WeekView({
+  tasks,
+  weekNumber,
+  onTaskClick,
+  onTaskDrop,
+  isAdmin
+}: {
+  tasks: Task[];
+  weekNumber: number;
+  onTaskClick: (task: Task) => void;
+  onTaskDrop: (taskId: string, updates: Partial<Task>) => void;
+  isAdmin: boolean;
+}) {
+  const weekRanges = {
+    1: { start: 1, end: 7 },
+    2: { start: 8, end: 15 },
+    3: { start: 16, end: 23 },
+    4: { start: 24, end: 31 }
+  };
+
+  const range = weekRanges[weekNumber as keyof typeof weekRanges];
+  const weekDays: { month: number; day: number; year: number; dayName: string }[] = [];
+
+  // Generate the 7 days for the selected week
+  for (let day = range.start; day <= range.end; day++) {
+    const date = new Date(2025, 0, day); // January is month 0
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    weekDays.push({
+      month: 1,
+      day,
+      year: 2025,
+      dayName: dayNames[date.getDay()]
+    });
+  }
+
+  const handleTaskDragStart = (e: React.DragEvent, task: Task) => {
+    if (!isAdmin) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.setData('taskId', task.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDayDragOver = (e: React.DragEvent) => {
+    if (!isAdmin) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDayDrop = (e: React.DragEvent, dateStr: string) => {
+    if (!isAdmin) return;
+    e.preventDefault();
+    const taskId = e.dataTransfer.getData('taskId');
+    if (taskId) {
+      onTaskDrop(taskId, { dueDate: dateStr, week: weekNumber });
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-lg p-6">
+      <h2 className="text-2xl font-bold mb-6">Week {weekNumber} - January {range.start}-{range.end}, 2025</h2>
+      <div className="grid grid-cols-7 gap-4">
+        {weekDays.map((dateObj) => {
+          const dateStr = `${dateObj.year}-${String(dateObj.month).padStart(2, '0')}-${String(dateObj.day).padStart(2, '0')}`;
+          const dayTasks = tasks.filter(t => t.dueDate.startsWith(dateStr));
+
+          return (
+            <div
+              key={dateObj.day}
+              className="min-h-96 p-4 border-2 rounded-lg bg-white hover:bg-gray-50 flex flex-col"
+              onDragOver={handleDayDragOver}
+              onDrop={(e) => handleDayDrop(e, dateStr)}
+            >
+              <div className="mb-3 pb-2 border-b border-gray-200">
+                <div className="text-sm font-medium text-gray-500">{dateObj.dayName}</div>
+                <div className="text-2xl font-bold text-gray-900">{dateObj.day}</div>
+              </div>
+              <div className="space-y-2 flex-1">
+                {dayTasks.map(task => (
+                  <div
+                    key={task.id}
+                    draggable={isAdmin}
+                    onDragStart={(e) => handleTaskDragStart(e, task)}
+                    className={`p-3 rounded-lg cursor-pointer border-l-4 shadow-sm hover:shadow-md transition-shadow ${
+                      task.company === 'Muncho' ? 'bg-blue-50 border-blue-500' :
+                      task.company === 'Foan' ? 'bg-green-50 border-green-500' :
+                      'bg-purple-50 border-purple-500'
+                    } ${isAdmin ? 'cursor-move' : ''}`}
+                    onClick={() => onTaskClick(task)}
+                  >
+                    <div className="font-medium text-sm mb-2 text-gray-900">{task.title}</div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className={`px-2 py-1 rounded ${
+                        task.company === 'Muncho' ? 'bg-blue-100 text-blue-800' :
+                        task.company === 'Foan' ? 'bg-green-100 text-green-800' :
+                        'bg-purple-100 text-purple-800'
+                      }`}>
+                        {task.company}
+                      </span>
+                      <span className={`px-2 py-1 rounded ${
+                        task.status === 'done' ? 'bg-green-100 text-green-800' :
+                        task.status === 'review' ? 'bg-yellow-100 text-yellow-800' :
+                        task.status === 'inProgress' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {task.status === 'inProgress' ? 'In Progress' :
+                         task.status === 'todo' ? 'To Do' :
+                         task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                      </span>
+                    </div>
+                    {task.assignees && task.assignees.length > 0 && (
+                      <div className="mt-2 text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                        {task.assignees.join(', ')}
+                      </div>
+                    )}
+                    {task.subtasks && task.subtasks.length > 0 && (
+                      <div className="mt-2">
+                        <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                          <span>{task.subtasks.filter(st => st.completed).length}/{task.subtasks.length} subtasks</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5">
+                          <div
+                            className="bg-gray-800 h-1.5 rounded-full transition-all"
+                            style={{ width: `${(task.subtasks.filter(st => st.completed).length / task.subtasks.length) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

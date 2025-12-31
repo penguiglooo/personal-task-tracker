@@ -43,6 +43,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (updates.company) updateData.company = updates.company;
     if (updates.status) updateData.status = updates.status;
     if (updates.assignees !== undefined) updateData.assignees = updates.assignees;
+    if (updates.startDate !== undefined) updateData.start_date = updates.startDate;
     if (updates.dueDate) updateData.due_date = updates.dueDate;
     if (updates.week !== undefined) {
       updateData.week = updates.week;
@@ -63,6 +64,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       week: updated.week,
       status: updated.status,
       assignees: updated.assignees || [],
+      startDate: updated.start_date,
       dueDate: updated.due_date,
       comments: updated.comments || [],
       subtasks: updated.subtasks || [],

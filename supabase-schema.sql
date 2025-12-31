@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   week INTEGER NOT NULL CHECK (week >= 1 AND week <= 4),
   status TEXT DEFAULT 'todo' CHECK (status IN ('todo', 'inProgress', 'review', 'done')),
   assignee TEXT,
+  start_date TIMESTAMPTZ,
   due_date TIMESTAMPTZ NOT NULL,
   comments JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),

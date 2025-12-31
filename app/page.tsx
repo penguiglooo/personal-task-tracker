@@ -38,6 +38,7 @@ interface Task {
   week: number | null;
   status: 'todo' | 'inProgress' | 'review' | 'done';
   assignees: string[];
+  startDate?: string;
   dueDate: string;
   comments: Comment[];
   subtasks?: Subtask[];
@@ -696,6 +697,7 @@ export default function DashboardPage() {
                   tasks={filteredTasks}
                   onTaskClick={setSelectedTask}
                   onTaskDrop={updateTask}
+                  onCreateTask={() => createTask(1, 'todo')}
                   isAdmin={isAdmin}
                 />
               ) : (
@@ -704,6 +706,7 @@ export default function DashboardPage() {
                   weekNumber={selectedWeekForWeekView}
                   onTaskClick={setSelectedTask}
                   onTaskDrop={updateTask}
+                  onCreateTask={() => createTask(selectedWeekForWeekView, 'todo')}
                   isAdmin={isAdmin}
                 />
               )}
@@ -930,22 +933,28 @@ function CalendarView({
   tasks,
   onTaskClick,
   onTaskDrop,
+  onCreateTask,
   isAdmin
 }: {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
   onTaskDrop: (taskId: string, updates: Partial<Task>) => void;
+  onCreateTask: () => void;
   isAdmin: boolean;
 }) {
-  type DateObj = { month: number; day: number; year: number };
+  type DateObj = { month: number; day: number; year: number; dateStr: string };
+  const [resizingTask, setResizingTask] = useState<{ taskId: string; edge: 'start' | 'end' } | null>(null);
+
   const calendarDays: DateObj[] = [];
 
   for (let day = 29; day <= 31; day++) {
-    calendarDays.push({ month: 12, day, year: 2025 });
+    const dateStr = `2025-12-${String(day).padStart(2, '0')}`;
+    calendarDays.push({ month: 12, day, year: 2025, dateStr });
   }
 
   for (let day = 1; day <= 31; day++) {
-    calendarDays.push({ month: 1, day, year: 2026 });
+    const dateStr = `2026-01-${String(day).padStart(2, '0')}`;
+    calendarDays.push({ month: 1, day, year: 2026, dateStr });
   }
 
   const weeks: DateObj[][] = [];
@@ -959,6 +968,43 @@ function CalendarView({
     }
   });
 
+  // Helper to check if a date is between start and due date (inclusive)
+  const isDateInTaskRange = (dateStr: string, task: Task) => {
+    const taskStart = task.startDate || task.dueDate;
+    const taskEnd = task.dueDate;
+    return dateStr >= taskStart && dateStr <= taskEnd;
+  };
+
+  // Helper to determine if this is the first day of a multi-day task in this week
+  const isFirstDayInWeek = (dateStr: string, task: Task, week: DateObj[]) => {
+    const taskStart = task.startDate || task.dueDate;
+    if (dateStr !== taskStart) {
+      // Check if start date is in a previous week
+      const dateIndex = week.findIndex(d => d.dateStr === dateStr);
+      if (dateIndex === 0) {
+        // First day of week, check if task started before
+        return dateStr > taskStart;
+      }
+      return false;
+    }
+    return true;
+  };
+
+  // Helper to determine if this is the last day of a multi-day task in this week
+  const isLastDayInWeek = (dateStr: string, task: Task, week: DateObj[]) => {
+    const taskEnd = task.dueDate;
+    if (dateStr !== taskEnd) {
+      // Check if end date is in a later week
+      const dateIndex = week.findIndex(d => d.dateStr === dateStr);
+      if (dateIndex === 6) {
+        // Last day of week, check if task continues
+        return dateStr < taskEnd;
+      }
+      return false;
+    }
+    return true;
+  };
+
   const handleTaskDragStart = (e: React.DragEvent, task: Task) => {
     if (!isAdmin) {
       e.preventDefault();
@@ -967,6 +1013,51 @@ function CalendarView({
     e.dataTransfer.setData('taskId', task.id);
     e.dataTransfer.effectAllowed = 'move';
   };
+
+  const handleEdgeMouseDown = (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => {
+    if (!isAdmin) return;
+    e.stopPropagation();
+    setResizingTask({ taskId: task.id, edge });
+  };
+
+  const handleDayMouseEnter = (dateStr: string) => {
+    if (!isAdmin || !resizingTask) return;
+
+    const task = tasks.find(t => t.id === resizingTask.taskId);
+    if (!task) return;
+
+    const date = new Date(dateStr);
+    const day = date.getDate();
+    let week = 1;
+    if (day <= 7) week = 1;
+    else if (day <= 15) week = 2;
+    else if (day <= 23) week = 3;
+    else week = 4;
+
+    if (resizingTask.edge === 'start') {
+      // Ensure start date doesn't go past due date
+      if (dateStr <= task.dueDate) {
+        onTaskDrop(task.id, { startDate: dateStr, week });
+      }
+    } else {
+      // Ensure due date doesn't go before start date
+      const taskStart = task.startDate || task.dueDate;
+      if (dateStr >= taskStart) {
+        onTaskDrop(task.id, { dueDate: dateStr, week });
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    setResizingTask(null);
+  };
+
+  useEffect(() => {
+    if (resizingTask) {
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => window.removeEventListener('mouseup', handleMouseUp);
+    }
+  }, [resizingTask]);
 
   const handleDayDragOver = (e: React.DragEvent) => {
     if (!isAdmin) return;
@@ -979,6 +1070,9 @@ function CalendarView({
     e.preventDefault();
     const taskId = e.dataTransfer.getData('taskId');
     if (taskId) {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
       const date = new Date(dateStr);
       const day = date.getDate();
       let week = 1;
@@ -987,13 +1081,37 @@ function CalendarView({
       else if (day <= 23) week = 3;
       else week = 4;
 
-      onTaskDrop(taskId, { dueDate: dateStr, week });
+      // If task has a startDate, maintain the duration
+      if (task.startDate) {
+        const startDate = new Date(task.startDate);
+        const dueDate = new Date(task.dueDate);
+        const duration = Math.floor((dueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        const newDueDate = new Date(dateStr);
+        newDueDate.setDate(newDueDate.getDate() + duration);
+        const newDueDateStr = newDueDate.toISOString().split('T')[0];
+
+        onTaskDrop(taskId, { startDate: dateStr, dueDate: newDueDateStr, week });
+      } else {
+        onTaskDrop(taskId, { dueDate: dateStr, week });
+      }
     }
   };
 
   return (
     <div className="bg-white rounded-lg p-6">
-      <h2 className="text-2xl font-bold mb-6">December 2025 - January 2026</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">December 2025 - January 2026</h2>
+        {isAdmin && (
+          <button
+            onClick={onCreateTask}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <span className="text-lg">+</span>
+            Add Task
+          </button>
+        )}
+      </div>
       <div className="grid grid-cols-7 gap-2">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
           <div key={day} className="font-bold text-center p-2">{day}</div>
@@ -1002,9 +1120,11 @@ function CalendarView({
           week.map((dateObj, dayIdx) => {
             if (!dateObj) return <div key={`${weekIdx}-${dayIdx}`} className="min-h-24 bg-gray-100" />;
 
-            const dateStr = `${dateObj.year}-${String(dateObj.month).padStart(2, '0')}-${String(dateObj.day).padStart(2, '0')}`;
-            const dayTasks = tasks.filter(t => t.dueDate.startsWith(dateStr));
-            const isDecember = dateObj.month === 12;
+            const { dateStr, day, month } = dateObj;
+            const isDecember = month === 12;
+
+            // Get tasks that span this day
+            const dayTasks = tasks.filter(t => isDateInTaskRange(dateStr, t));
 
             return (
               <div
@@ -1012,26 +1132,58 @@ function CalendarView({
                 className={`min-h-24 p-2 border rounded ${isDecember ? 'bg-gray-50' : 'bg-white hover:bg-gray-50'}`}
                 onDragOver={handleDayDragOver}
                 onDrop={(e) => handleDayDrop(e, dateStr)}
+                onMouseEnter={() => handleDayMouseEnter(dateStr)}
               >
                 <div className={`font-semibold mb-1 ${isDecember ? 'text-gray-400' : ''}`}>
-                  {dateObj.day} {isDecember ? 'Dec' : ''}
+                  {day} {isDecember ? 'Dec' : ''}
                 </div>
                 <div className="space-y-1">
-                  {dayTasks.map(task => (
-                    <div
-                      key={task.id}
-                      draggable={isAdmin}
-                      onDragStart={(e) => handleTaskDragStart(e, task)}
-                      className={`text-xs p-1 rounded cursor-pointer ${
-                        task.company === 'Muncho' ? 'bg-blue-100 text-blue-800' :
-                        task.company === 'Foan' ? 'bg-green-100 text-green-800' :
-                        'bg-purple-100 text-purple-800'
-                      } ${isAdmin ? 'cursor-move' : ''}`}
-                      onClick={() => onTaskClick(task)}
-                    >
-                      {task.title}
-                    </div>
-                  ))}
+                  {dayTasks.map(task => {
+                    const isMultiDay = task.startDate && task.startDate !== task.dueDate;
+                    const isFirstDay = isFirstDayInWeek(dateStr, task, week);
+                    const isLastDay = isLastDayInWeek(dateStr, task, week);
+
+                    return (
+                      <div
+                        key={task.id}
+                        draggable={isAdmin && !resizingTask}
+                        onDragStart={(e) => handleTaskDragStart(e, task)}
+                        className={`text-xs p-1 rounded cursor-pointer relative group ${
+                          task.company === 'Muncho' ? 'bg-blue-100 text-blue-800' :
+                          task.company === 'Foan' ? 'bg-green-100 text-green-800' :
+                          'bg-purple-100 text-purple-800'
+                        } ${isAdmin ? 'cursor-move' : ''} ${
+                          isMultiDay && !isFirstDay ? 'rounded-l-none' : ''
+                        } ${
+                          isMultiDay && !isLastDay ? 'rounded-r-none' : ''
+                        }`}
+                        onClick={() => onTaskClick(task)}
+                      >
+                        {isFirstDay && task.title}
+                        {!isFirstDay && isMultiDay && '...'}
+
+                        {task.status === 'done' && isFirstDay && (
+                          <div className="absolute top-0 right-0 bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs font-bold">
+                            ✓
+                          </div>
+                        )}
+
+                        {/* Edge resize handles */}
+                        {isAdmin && isMultiDay && isFirstDay && (
+                          <div
+                            className="absolute left-0 top-0 bottom-0 w-1 bg-gray-800 opacity-0 group-hover:opacity-50 hover:opacity-100 cursor-ew-resize"
+                            onMouseDown={(e) => handleEdgeMouseDown(e, task, 'start')}
+                          />
+                        )}
+                        {isAdmin && isMultiDay && isLastDay && (
+                          <div
+                            className="absolute right-0 top-0 bottom-0 w-1 bg-gray-800 opacity-0 group-hover:opacity-50 hover:opacity-100 cursor-ew-resize"
+                            onMouseDown={(e) => handleEdgeMouseDown(e, task, 'end')}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -1478,14 +1630,18 @@ function WeekView({
   weekNumber,
   onTaskClick,
   onTaskDrop,
+  onCreateTask,
   isAdmin
 }: {
   tasks: Task[];
   weekNumber: number;
   onTaskClick: (task: Task) => void;
   onTaskDrop: (taskId: string, updates: Partial<Task>) => void;
+  onCreateTask: () => void;
   isAdmin: boolean;
 }) {
+  const [resizingTask, setResizingTask] = useState<{ taskId: string; edge: 'start' | 'end' } | null>(null);
+
   const weekRanges = {
     1: { start: 1, end: 7 },
     2: { start: 8, end: 15 },
@@ -1494,19 +1650,28 @@ function WeekView({
   };
 
   const range = weekRanges[weekNumber as keyof typeof weekRanges];
-  const weekDays: { month: number; day: number; year: number; dayName: string }[] = [];
+  const weekDays: { month: number; day: number; year: number; dayName: string; dateStr: string }[] = [];
 
   // Generate the 7 days for the selected week
   for (let day = range.start; day <= range.end; day++) {
     const date = new Date(2026, 0, day); // January is month 0
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dateStr = `2026-01-${String(day).padStart(2, '0')}`;
     weekDays.push({
       month: 1,
       day,
       year: 2026,
-      dayName: dayNames[date.getDay()]
+      dayName: dayNames[date.getDay()],
+      dateStr
     });
   }
+
+  // Helper to check if a date is between start and due date (inclusive)
+  const isDateInTaskRange = (dateStr: string, task: Task) => {
+    const taskStart = task.startDate || task.dueDate;
+    const taskEnd = task.dueDate;
+    return dateStr >= taskStart && dateStr <= taskEnd;
+  };
 
   const handleTaskDragStart = (e: React.DragEvent, task: Task) => {
     if (!isAdmin) {
@@ -1516,6 +1681,43 @@ function WeekView({
     e.dataTransfer.setData('taskId', task.id);
     e.dataTransfer.effectAllowed = 'move';
   };
+
+  const handleEdgeMouseDown = (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => {
+    if (!isAdmin) return;
+    e.stopPropagation();
+    setResizingTask({ taskId: task.id, edge });
+  };
+
+  const handleDayMouseEnter = (dateStr: string) => {
+    if (!isAdmin || !resizingTask) return;
+
+    const task = tasks.find(t => t.id === resizingTask.taskId);
+    if (!task) return;
+
+    if (resizingTask.edge === 'start') {
+      // Ensure start date doesn't go past due date
+      if (dateStr <= task.dueDate) {
+        onTaskDrop(task.id, { startDate: dateStr, week: weekNumber });
+      }
+    } else {
+      // Ensure due date doesn't go before start date
+      const taskStart = task.startDate || task.dueDate;
+      if (dateStr >= taskStart) {
+        onTaskDrop(task.id, { dueDate: dateStr, week: weekNumber });
+      }
+    }
+  };
+
+  const handleMouseUp = () => {
+    setResizingTask(null);
+  };
+
+  useEffect(() => {
+    if (resizingTask) {
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => window.removeEventListener('mouseup', handleMouseUp);
+    }
+  }, [resizingTask]);
 
   const handleDayDragOver = (e: React.DragEvent) => {
     if (!isAdmin) return;
@@ -1528,17 +1730,44 @@ function WeekView({
     e.preventDefault();
     const taskId = e.dataTransfer.getData('taskId');
     if (taskId) {
-      onTaskDrop(taskId, { dueDate: dateStr, week: weekNumber });
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      // If task has a startDate, maintain the duration
+      if (task.startDate) {
+        const startDate = new Date(task.startDate);
+        const dueDate = new Date(task.dueDate);
+        const duration = Math.floor((dueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        const newDueDate = new Date(dateStr);
+        newDueDate.setDate(newDueDate.getDate() + duration);
+        const newDueDateStr = newDueDate.toISOString().split('T')[0];
+
+        onTaskDrop(taskId, { startDate: dateStr, dueDate: newDueDateStr, week: weekNumber });
+      } else {
+        onTaskDrop(taskId, { dueDate: dateStr, week: weekNumber });
+      }
     }
   };
 
   return (
     <div className="bg-white rounded-lg p-6">
-      <h2 className="text-2xl font-bold mb-6">Week {weekNumber} - January {range.start}-{range.end}, 2026</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Week {weekNumber} - January {range.start}-{range.end}, 2026</h2>
+        {isAdmin && (
+          <button
+            onClick={onCreateTask}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <span className="text-lg">+</span>
+            Add Task
+          </button>
+        )}
+      </div>
       <div className="grid grid-cols-7 gap-4">
         {weekDays.map((dateObj) => {
-          const dateStr = `${dateObj.year}-${String(dateObj.month).padStart(2, '0')}-${String(dateObj.day).padStart(2, '0')}`;
-          const dayTasks = tasks.filter(t => t.dueDate.startsWith(dateStr));
+          const { dateStr } = dateObj;
+          const dayTasks = tasks.filter(t => isDateInTaskRange(dateStr, t));
 
           return (
             <div
@@ -1546,76 +1775,110 @@ function WeekView({
               className="min-h-96 p-4 border-2 rounded-lg bg-white hover:bg-gray-50 flex flex-col"
               onDragOver={handleDayDragOver}
               onDrop={(e) => handleDayDrop(e, dateStr)}
+              onMouseEnter={() => handleDayMouseEnter(dateStr)}
             >
               <div className="mb-3 pb-2 border-b border-gray-200">
                 <div className="text-sm font-medium text-gray-500">{dateObj.dayName}</div>
                 <div className="text-2xl font-bold text-gray-900">{dateObj.day}</div>
               </div>
               <div className="space-y-3 flex-1 overflow-y-auto">
-                {dayTasks.map(task => (
-                  <div
-                    key={task.id}
-                    draggable={isAdmin}
-                    onDragStart={(e) => handleTaskDragStart(e, task)}
-                    className={`p-3 rounded-md cursor-pointer border-l-4 shadow-sm hover:shadow-md transition-all ${
-                      task.company === 'Muncho' ? 'bg-blue-50 border-blue-500' :
-                      task.company === 'Foan' ? 'bg-green-50 border-green-500' :
-                      'bg-purple-50 border-purple-500'
-                    } ${isAdmin ? 'cursor-move' : ''}`}
-                    onClick={() => onTaskClick(task)}
-                  >
-                    <div className="font-semibold text-sm mb-3 text-gray-900 leading-snug">{task.title}</div>
+                {dayTasks.map(task => {
+                  const isMultiDay = task.startDate && task.startDate !== task.dueDate;
+                  const isStartDay = dateStr === (task.startDate || task.dueDate);
+                  const isEndDay = dateStr === task.dueDate;
 
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-1.5">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          task.company === 'Muncho' ? 'bg-blue-100 text-blue-800' :
-                          task.company === 'Foan' ? 'bg-green-100 text-green-800' :
-                          'bg-purple-100 text-purple-800'
-                        }`}>
-                          {task.company}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          task.status === 'done' ? 'bg-green-100 text-green-800' :
-                          task.status === 'review' ? 'bg-yellow-100 text-yellow-800' :
-                          task.status === 'inProgress' ? 'bg-blue-100 text-blue-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {task.status === 'inProgress' ? 'In Progress' :
-                           task.status === 'todo' ? 'To Do' :
-                           task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-                        </span>
+                  return (
+                    <div
+                      key={task.id}
+                      draggable={isAdmin && !resizingTask}
+                      onDragStart={(e) => handleTaskDragStart(e, task)}
+                      className={`p-3 rounded-md cursor-pointer border-l-4 shadow-sm hover:shadow-md transition-all relative group ${
+                        task.company === 'Muncho' ? 'bg-blue-50 border-blue-500' :
+                        task.company === 'Foan' ? 'bg-green-50 border-green-500' :
+                        'bg-purple-50 border-purple-500'
+                      } ${isAdmin ? 'cursor-move' : ''}`}
+                      onClick={() => onTaskClick(task)}
+                    >
+                      {task.status === 'done' && (
+                        <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-md z-10">
+                          ✓
+                        </div>
+                      )}
+
+                      <div className="font-semibold text-sm mb-3 text-gray-900 leading-snug">
+                        {task.title}
+                        {isMultiDay && (
+                          <span className="ml-2 text-xs font-normal text-gray-500">
+                            ({isStartDay ? 'Start' : isEndDay ? 'End' : 'Cont.'})
+                          </span>
+                        )}
                       </div>
 
-                      {task.assignees && task.assignees.length > 0 && (
-                        <div className="text-xs text-gray-700 bg-white bg-opacity-60 px-2 py-1 rounded">
-                          👤 {task.assignees.join(', ')}
-                        </div>
+                      {/* Edge resize handles */}
+                      {isAdmin && isMultiDay && isStartDay && (
+                        <div
+                          className="absolute left-0 top-0 bottom-0 w-2 bg-gray-800 opacity-0 group-hover:opacity-50 hover:opacity-100 cursor-ew-resize rounded-l-md"
+                          onMouseDown={(e) => handleEdgeMouseDown(e, task, 'start')}
+                        />
+                      )}
+                      {isAdmin && isMultiDay && isEndDay && (
+                        <div
+                          className="absolute right-0 top-0 bottom-0 w-2 bg-gray-800 opacity-0 group-hover:opacity-50 hover:opacity-100 cursor-ew-resize rounded-r-md"
+                          onMouseDown={(e) => handleEdgeMouseDown(e, task, 'end')}
+                        />
                       )}
 
-                      {task.attachments && task.attachments.length > 0 && (
-                        <div className="text-xs text-gray-600 bg-white bg-opacity-60 px-2 py-1 rounded">
-                          📎 {task.attachments.length} file{task.attachments.length !== 1 ? 's' : ''}
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            task.company === 'Muncho' ? 'bg-blue-100 text-blue-800' :
+                            task.company === 'Foan' ? 'bg-green-100 text-green-800' :
+                            'bg-purple-100 text-purple-800'
+                          }`}>
+                            {task.company}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            task.status === 'done' ? 'bg-green-100 text-green-800' :
+                            task.status === 'review' ? 'bg-yellow-100 text-yellow-800' :
+                            task.status === 'inProgress' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {task.status === 'inProgress' ? 'In Progress' :
+                             task.status === 'todo' ? 'To Do' :
+                             task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                          </span>
                         </div>
-                      )}
 
-                      {task.subtasks && task.subtasks.length > 0 && (
-                        <div className="pt-1">
-                          <div className="flex items-center justify-between text-xs text-gray-600 mb-1.5">
-                            <span className="font-medium">{task.subtasks.filter(st => st.completed).length}/{task.subtasks.length} subtasks</span>
-                            <span className="text-gray-500">{Math.round((task.subtasks.filter(st => st.completed).length / task.subtasks.length) * 100)}%</span>
+                        {task.assignees && task.assignees.length > 0 && (
+                          <div className="text-xs text-gray-700 bg-white bg-opacity-60 px-2 py-1 rounded">
+                            👤 {task.assignees.join(', ')}
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-1.5">
-                            <div
-                              className="bg-gray-800 h-1.5 rounded-full transition-all"
-                              style={{ width: `${(task.subtasks.filter(st => st.completed).length / task.subtasks.length) * 100}%` }}
-                            />
+                        )}
+
+                        {task.attachments && task.attachments.length > 0 && (
+                          <div className="text-xs text-gray-600 bg-white bg-opacity-60 px-2 py-1 rounded">
+                            📎 {task.attachments.length} file{task.attachments.length !== 1 ? 's' : ''}
                           </div>
-                        </div>
-                      )}
+                        )}
+
+                        {task.subtasks && task.subtasks.length > 0 && (
+                          <div className="pt-1">
+                            <div className="flex items-center justify-between text-xs text-gray-600 mb-1.5">
+                              <span className="font-medium">{task.subtasks.filter(st => st.completed).length}/{task.subtasks.length} subtasks</span>
+                              <span className="text-gray-500">{Math.round((task.subtasks.filter(st => st.completed).length / task.subtasks.length) * 100)}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                              <div
+                                className="bg-gray-800 h-1.5 rounded-full transition-all"
+                                style={{ width: `${(task.subtasks.filter(st => st.completed).length / task.subtasks.length) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
@@ -2096,13 +2359,49 @@ function TaskModal({
             </div>
 
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Start Date (Optional)</label>
+              <input
+                type="date"
+                value={editedTask.startDate ? editedTask.startDate.split('T')[0] : ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const startDate = value ? value : undefined;
+                  const dueDateStr = editedTask.dueDate ? editedTask.dueDate.split('T')[0] : '';
+
+                  // If start date is set and is after due date, adjust due date
+                  if (startDate && dueDateStr && startDate > dueDateStr) {
+                    const newWeek = getWeekFromDate(startDate);
+                    setEditedTask({...editedTask, startDate, dueDate: startDate, week: newWeek});
+                  } else {
+                    setEditedTask({...editedTask, startDate});
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                disabled={!isAdmin}
+              />
+              <div className="mt-1 text-xs text-gray-500">
+                Leave empty for single-day tasks
+              </div>
+            </div>
+
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
               <input
                 type="date"
                 value={editedTask.dueDate.split('T')[0]}
                 onChange={(e) => {
-                  const newWeek = getWeekFromDate(e.target.value);
-                  setEditedTask({...editedTask, dueDate: e.target.value, week: newWeek});
+                  const dueDate = e.target.value;
+                  if (!dueDate) return; // Prevent empty due date
+
+                  const newWeek = getWeekFromDate(dueDate);
+                  const startDateStr = editedTask.startDate ? editedTask.startDate.split('T')[0] : '';
+
+                  // If due date is before start date, adjust start date
+                  if (startDateStr && dueDate < startDateStr) {
+                    setEditedTask({...editedTask, startDate: dueDate, dueDate, week: newWeek});
+                  } else {
+                    setEditedTask({...editedTask, dueDate, week: newWeek});
+                  }
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
                 disabled={!isAdmin}

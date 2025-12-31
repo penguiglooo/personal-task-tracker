@@ -32,6 +32,8 @@ interface Task {
   subtasks?: Subtask[];
   isBacklog?: boolean;
   createdAt: string;
+  difficulty?: 'Easy' | 'Medium' | 'Hard';
+  importance?: 'Low' | 'Medium' | 'High' | 'Critical';
 }
 
 const TEAM_MEMBERS = ['Dhruv', 'Akaash', 'Swapnil', 'Sneha', 'Aniket', 'Saurabh'];
@@ -795,7 +797,7 @@ function TaskCard({
         </div>
       )}
       <div className="font-medium text-gray-900 mb-2 pr-12">{task.title}</div>
-      <div className="flex items-center justify-between text-xs text-gray-600">
+      <div className="flex flex-wrap gap-1.5 mb-2 text-xs">
         <span className={`px-2 py-1 rounded ${
           task.company === 'Muncho' ? 'bg-blue-100 text-blue-800' :
           task.company === 'Foan' ? 'bg-green-100 text-green-800' :
@@ -803,12 +805,33 @@ function TaskCard({
         }`}>
           {task.company}
         </span>
-        {task.assignees && task.assignees.length > 0 && (
-          <span className="bg-gray-100 px-2 py-1 rounded text-xs">
-            {task.assignees.join(', ')}
+        {task.difficulty && (
+          <span className={`px-2 py-1 rounded font-medium ${
+            task.difficulty === 'Easy' ? 'bg-green-100 text-green-700' :
+            task.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+            'bg-red-100 text-red-700'
+          }`}>
+            {task.difficulty}
+          </span>
+        )}
+        {task.importance && (
+          <span className={`px-2 py-1 rounded font-medium ${
+            task.importance === 'Low' ? 'bg-gray-100 text-gray-700' :
+            task.importance === 'Medium' ? 'bg-blue-100 text-blue-700' :
+            task.importance === 'High' ? 'bg-orange-100 text-orange-700' :
+            'bg-red-100 text-red-800'
+          }`}>
+            {task.importance === 'Critical' ? '⚠️ Critical' : task.importance}
           </span>
         )}
       </div>
+      {task.assignees && task.assignees.length > 0 && (
+        <div className="text-xs mb-2">
+          <span className="bg-gray-100 px-2 py-1 rounded">
+            {task.assignees.join(', ')}
+          </span>
+        </div>
+      )}
       {task.comments.length > 0 && (
         <div className="mt-2 text-xs text-gray-500">
           💬 {task.comments.length} comment{task.comments.length !== 1 ? 's' : ''}
@@ -951,6 +974,13 @@ function CalendarView({
 function AnalyticsView({ tasks }: { tasks: Task[] }) {
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
 
+  // Weighting system: difficulty * importance = task weight
+  const getTaskWeight = (task: Task) => {
+    const difficultyWeight = task.difficulty === 'Hard' ? 3 : task.difficulty === 'Medium' ? 2 : 1;
+    const importanceWeight = task.importance === 'Critical' ? 4 : task.importance === 'High' ? 3 : task.importance === 'Medium' ? 2 : 1;
+    return difficultyWeight * importanceWeight;
+  };
+
   // Calculate metrics for each employee
   const employeeMetrics = TEAM_MEMBERS.map(member => {
     const memberTasks = tasks.filter(t => t.assignees && t.assignees.includes(member));
@@ -977,6 +1007,13 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
     const completedTasks = memberTasks.filter(t => t.status === 'done').length;
     const completionRate = totalTasks > 0 ? (completedTasks / totalTasks * 100).toFixed(1) : '0.0';
 
+    // Weighted completion (based on difficulty + importance)
+    const totalWeight = memberTasks.reduce((sum, task) => sum + getTaskWeight(task), 0);
+    const completedWeight = memberTasks
+      .filter(t => t.status === 'done')
+      .reduce((sum, task) => sum + getTaskWeight(task), 0);
+    const weightedCompletionRate = totalWeight > 0 ? (completedWeight / totalWeight * 100).toFixed(1) : '0.0';
+
     // Subtasks completion
     const allSubtasks = memberTasks.flatMap(t => t.subtasks || []);
     const completedSubtasks = allSubtasks.filter(st => st.completed).length;
@@ -987,6 +1024,9 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
       totalTasks,
       completedTasks,
       completionRate: parseFloat(completionRate),
+      weightedCompletionRate: parseFloat(weightedCompletionRate),
+      totalWeight,
+      completedWeight,
       weeklyData,
       munchoTaskCount: munchoTasks.length,
       foanTaskCount: foanTasks.length,
@@ -1043,10 +1083,8 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Employee</th>
                 <th className="text-center py-3 px-4 font-semibold text-gray-700">Total Tasks</th>
                 <th className="text-center py-3 px-4 font-semibold text-gray-700">Completed</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700">In Progress</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700">Review</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700">Completion Rate</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700">Subtasks</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700">Task Weight</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700">Weighted %</th>
                 <th className="text-center py-3 px-4 font-semibold text-gray-700">Actions</th>
               </tr>
             </thead>
@@ -1067,21 +1105,21 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
                       {emp.completedTasks}
                     </span>
                   </td>
-                  <td className="text-center py-3 px-4 text-gray-700">{emp.inProgressCount}</td>
-                  <td className="text-center py-3 px-4 text-gray-700">{emp.reviewCount}</td>
+                  <td className="text-center py-3 px-4">
+                    <div className="text-xs text-gray-600">
+                      {emp.completedWeight}/{emp.totalWeight}
+                    </div>
+                  </td>
                   <td className="text-center py-3 px-4">
                     <div className="flex items-center justify-center gap-2">
                       <div className="w-20 bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-gray-800 h-2 rounded-full"
-                          style={{ width: `${emp.completionRate}%` }}
+                          style={{ width: `${emp.weightedCompletionRate}%` }}
                         />
                       </div>
-                      <span className="font-semibold text-gray-900">{emp.completionRate}%</span>
+                      <span className="font-semibold text-gray-900">{emp.weightedCompletionRate}%</span>
                     </div>
-                  </td>
-                  <td className="text-center py-3 px-4 text-gray-700">
-                    {emp.subtaskCompleted}/{emp.subtaskTotal}
                   </td>
                   <td className="text-center py-3 px-4">
                     <button
@@ -1561,6 +1599,39 @@ function TaskModal({
                 <option value="3">Week 3 (Jan 16-23)</option>
                 <option value="4">Week 4 (Jan 24-31)</option>
               </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Difficulty</label>
+                <select
+                  value={editedTask.difficulty || ''}
+                  onChange={(e) => setEditedTask({...editedTask, difficulty: e.target.value as any})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                  disabled={!isAdmin}
+                >
+                  <option value="">Not Set</option>
+                  <option value="Easy">Easy</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Hard">Hard</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Importance</label>
+                <select
+                  value={editedTask.importance || ''}
+                  onChange={(e) => setEditedTask({...editedTask, importance: e.target.value as any})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                  disabled={!isAdmin}
+                >
+                  <option value="">Not Set</option>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
+                </select>
+              </div>
             </div>
 
             <div>

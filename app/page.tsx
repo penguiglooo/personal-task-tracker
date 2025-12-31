@@ -389,54 +389,93 @@ export default function DashboardPage() {
     const backlogTasks = filteredTasks.filter(t => t.week === null || t.isBacklog);
 
     return (
-      <div className="bg-purple-50 rounded-lg p-6 border-2 border-purple-200">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-purple-900 mb-2">📋 Backlog Tasks</h2>
-          <p className="text-purple-700 text-sm">
-            These are smaller tasks that can be picked up anytime. Assign them to a week to move them to the weekly board.
-          </p>
+      <div className="bg-white rounded-lg p-6 border border-gray-200">
+        <div className="mb-6 flex justify-between items-start">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">📋 Backlog</h2>
+            <p className="text-gray-600 text-sm">
+              {isAdmin
+                ? 'Tasks waiting to be assigned to a specific week. Click on a task to assign it to a week.'
+                : 'Tasks in backlog waiting to be scheduled.'
+              }
+            </p>
+          </div>
+          {isAdmin && (
+            <button
+              onClick={() => createTask(null, 'todo')}
+              className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 text-sm font-medium"
+            >
+              + Add Backlog Task
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-4 gap-4">
-          {STATUS_COLUMNS.map(status => (
-            <div
-              key={status}
-              className="bg-white rounded-lg p-4 border border-purple-200"
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, status)}
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-purple-700 text-lg">
-                  {STATUS_LABELS[status]}
-                  <span className="ml-2 text-sm text-purple-500">
-                    ({backlogTasks.filter(t => t.status === status).length})
-                  </span>
-                </h3>
-                {isAdmin && (
-                  <button
-                    onClick={() => createTask(null, status)}
-                    className="w-6 h-6 flex items-center justify-center bg-purple-600 text-white rounded hover:bg-purple-700 text-lg font-bold"
-                    title="Add new backlog task"
-                  >
-                    +
-                  </button>
-                )}
-              </div>
-              <div className="space-y-3">
-                {backlogTasks.filter(t => t.status === status).map(task => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onEdit={() => setSelectedTask(task)}
-                    onDragStart={handleDragStart}
-                    onDragOver={handleCardDragOver}
-                    onDrop={handleCardDrop}
-                    canDrag={true}
-                  />
-                ))}
-              </div>
+        <div className="space-y-3">
+          {backlogTasks.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              No tasks in backlog
             </div>
-          ))}
+          ) : (
+            backlogTasks.map(task => (
+              <div
+                key={task.id}
+                onClick={() => setSelectedTask(task)}
+                className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:bg-gray-100 cursor-pointer transition-colors"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 mb-2">{task.title || '(No title)'}</h3>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className={`px-2 py-1 rounded ${
+                        task.company === 'Muncho' ? 'bg-blue-100 text-blue-800' :
+                        task.company === 'Foan' ? 'bg-green-100 text-green-800' :
+                        'bg-purple-100 text-purple-800'
+                      }`}>
+                        {task.company}
+                      </span>
+                      <span className={`px-2 py-1 rounded ${
+                        task.status === 'done' ? 'bg-green-100 text-green-800' :
+                        task.status === 'review' ? 'bg-yellow-100 text-yellow-800' :
+                        task.status === 'inProgress' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {STATUS_LABELS[task.status]}
+                      </span>
+                      {task.difficulty && (
+                        <span className={`px-2 py-1 rounded font-medium ${
+                          task.difficulty === 'Easy' ? 'bg-green-100 text-green-700' :
+                          task.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {task.difficulty}
+                        </span>
+                      )}
+                      {task.importance && (
+                        <span className={`px-2 py-1 rounded font-medium ${
+                          task.importance === 'Low' ? 'bg-gray-100 text-gray-700' :
+                          task.importance === 'Medium' ? 'bg-blue-100 text-blue-700' :
+                          task.importance === 'High' ? 'bg-orange-100 text-orange-700' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {task.importance === 'Critical' ? '⚠️ Critical' : task.importance}
+                        </span>
+                      )}
+                      {task.assignees && task.assignees.length > 0 && (
+                        <span className="bg-gray-100 text-gray-900 px-2 py-1 rounded">
+                          👤 {task.assignees.join(', ')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {isAdmin && (
+                    <div className="text-sm text-gray-500 whitespace-nowrap">
+                      Click to assign week →
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     );

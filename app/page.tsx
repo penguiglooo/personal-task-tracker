@@ -567,6 +567,18 @@ export default function DashboardPage() {
               Week {week} ({[1,8,16,24][week-1]}-{[7,15,23,31][week-1]} Jan)
             </button>
           ))}
+          {isAdmin && (
+            <button
+              onClick={() => setView('analytics')}
+              className={`px-4 py-2 rounded-lg font-medium ${
+                view === 'analytics'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              📊 Analytics
+            </button>
+          )}
         </div>
 
         <div className="mb-6">
@@ -628,6 +640,8 @@ export default function DashboardPage() {
                 />
               )}
             </>
+          ) : view === 'analytics' ? (
+            <AnalyticsView tasks={tasks} />
           ) : view === 'backlog' ? (
             renderBacklog()
           ) : (
@@ -930,6 +944,263 @@ function CalendarView({
           })
         )}
       </div>
+    </div>
+  );
+}
+
+function AnalyticsView({ tasks }: { tasks: Task[] }) {
+  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
+
+  // Calculate metrics for each employee
+  const employeeMetrics = TEAM_MEMBERS.map(member => {
+    const memberTasks = tasks.filter(t => t.assignees && t.assignees.includes(member));
+
+    // Weekly breakdown
+    const weeklyData = [1, 2, 3, 4].map(weekNum => {
+      const weekTasks = memberTasks.filter(t => t.week === weekNum);
+      return {
+        week: weekNum,
+        total: weekTasks.length,
+        completed: weekTasks.filter(t => t.status === 'done').length,
+        inProgress: weekTasks.filter(t => t.status === 'inProgress').length,
+        review: weekTasks.filter(t => t.status === 'review').length,
+        todo: weekTasks.filter(t => t.status === 'todo').length
+      };
+    });
+
+    // Company breakdown
+    const munchoTasks = memberTasks.filter(t => t.company === 'Muncho' || t.company === 'Both');
+    const foanTasks = memberTasks.filter(t => t.company === 'Foan' || t.company === 'Both');
+
+    // Overall stats
+    const totalTasks = memberTasks.length;
+    const completedTasks = memberTasks.filter(t => t.status === 'done').length;
+    const completionRate = totalTasks > 0 ? (completedTasks / totalTasks * 100).toFixed(1) : '0.0';
+
+    // Subtasks completion
+    const allSubtasks = memberTasks.flatMap(t => t.subtasks || []);
+    const completedSubtasks = allSubtasks.filter(st => st.completed).length;
+    const subtaskCompletionRate = allSubtasks.length > 0 ? (completedSubtasks / allSubtasks.length * 100).toFixed(1) : '0.0';
+
+    return {
+      name: member,
+      totalTasks,
+      completedTasks,
+      completionRate: parseFloat(completionRate),
+      weeklyData,
+      munchoTaskCount: munchoTasks.length,
+      foanTaskCount: foanTasks.length,
+      inProgressCount: memberTasks.filter(t => t.status === 'inProgress').length,
+      reviewCount: memberTasks.filter(t => t.status === 'review').length,
+      todoCount: memberTasks.filter(t => t.status === 'todo').length,
+      subtaskTotal: allSubtasks.length,
+      subtaskCompleted: completedSubtasks,
+      subtaskCompletionRate: parseFloat(subtaskCompletionRate),
+      tasks: memberTasks
+    };
+  });
+
+  // Sort by completion rate
+  const sortedEmployees = [...employeeMetrics].sort((a, b) => b.completionRate - a.completionRate);
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg p-6 text-white">
+        <h2 className="text-3xl font-bold mb-2">Team Analytics Dashboard</h2>
+        <p className="text-blue-100">January 2025 Performance Overview</p>
+      </div>
+
+      {/* Overall Summary Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg p-4 border-2 border-blue-200">
+          <div className="text-sm text-gray-600 mb-1">Total Tasks</div>
+          <div className="text-3xl font-bold text-gray-900">{tasks.length}</div>
+        </div>
+        <div className="bg-white rounded-lg p-4 border-2 border-green-200">
+          <div className="text-sm text-gray-600 mb-1">Completed</div>
+          <div className="text-3xl font-bold text-green-600">{tasks.filter(t => t.status === 'done').length}</div>
+        </div>
+        <div className="bg-white rounded-lg p-4 border-2 border-yellow-200">
+          <div className="text-sm text-gray-600 mb-1">In Progress</div>
+          <div className="text-3xl font-bold text-yellow-600">{tasks.filter(t => t.status === 'inProgress').length}</div>
+        </div>
+        <div className="bg-white rounded-lg p-4 border-2 border-purple-200">
+          <div className="text-sm text-gray-600 mb-1">Team Members</div>
+          <div className="text-3xl font-bold text-purple-600">{TEAM_MEMBERS.length}</div>
+        </div>
+      </div>
+
+      {/* Employee Performance Table */}
+      <div className="bg-white rounded-lg p-6 shadow-sm">
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Employee Performance Summary</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b-2 border-gray-200">
+                <th className="text-left py-3 px-4 font-semibold text-gray-700">Employee</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700">Total Tasks</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700">Completed</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700">In Progress</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700">Review</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700">Completion Rate</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700">Subtasks</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedEmployees.map(emp => (
+                <tr key={emp.name} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-semibold">
+                        {emp.name.charAt(0)}
+                      </div>
+                      <span className="font-medium text-gray-900">{emp.name}</span>
+                    </div>
+                  </td>
+                  <td className="text-center py-3 px-4 text-gray-700">{emp.totalTasks}</td>
+                  <td className="text-center py-3 px-4">
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded font-medium">
+                      {emp.completedTasks}
+                    </span>
+                  </td>
+                  <td className="text-center py-3 px-4 text-gray-700">{emp.inProgressCount}</td>
+                  <td className="text-center py-3 px-4 text-gray-700">{emp.reviewCount}</td>
+                  <td className="text-center py-3 px-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-20 bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full"
+                          style={{ width: `${emp.completionRate}%` }}
+                        />
+                      </div>
+                      <span className="font-semibold text-gray-900">{emp.completionRate}%</span>
+                    </div>
+                  </td>
+                  <td className="text-center py-3 px-4 text-gray-700">
+                    {emp.subtaskCompleted}/{emp.subtaskTotal}
+                  </td>
+                  <td className="text-center py-3 px-4">
+                    <button
+                      onClick={() => setSelectedEmployee(selectedEmployee === emp.name ? null : emp.name)}
+                      className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                    >
+                      {selectedEmployee === emp.name ? 'Hide' : 'Details'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Detailed Employee View */}
+      {selectedEmployee && (() => {
+        const empData = employeeMetrics.find(e => e.name === selectedEmployee);
+        if (!empData) return null;
+
+        return (
+          <div className="bg-white rounded-lg p-6 shadow-lg border-2 border-blue-300">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-1">{empData.name} - Detailed Analysis</h3>
+                <p className="text-gray-600">Complete performance breakdown for January 2025</p>
+              </div>
+              <button
+                onClick={() => setSelectedEmployee(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Weekly Performance */}
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Weekly Performance</h4>
+              <div className="grid grid-cols-4 gap-4">
+                {empData.weeklyData.map(week => (
+                  <div key={week.week} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="text-sm font-medium text-gray-600 mb-2">Week {week.week}</div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Total:</span>
+                        <span className="font-semibold">{week.total}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-green-600">Done:</span>
+                        <span className="font-semibold text-green-600">{week.completed}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-blue-600">In Progress:</span>
+                        <span className="font-semibold text-blue-600">{week.inProgress}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-yellow-600">Review:</span>
+                        <span className="font-semibold text-yellow-600">{week.review}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Company Distribution */}
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Company Distribution</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                  <div className="text-sm text-blue-700 mb-1">Muncho Tasks</div>
+                  <div className="text-3xl font-bold text-blue-900">{empData.munchoTaskCount}</div>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                  <div className="text-sm text-green-700 mb-1">Foan Tasks</div>
+                  <div className="text-3xl font-bold text-green-900">{empData.foanTaskCount}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Task List */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">All Assigned Tasks ({empData.tasks.length})</h4>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {empData.tasks.map(task => (
+                  <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900 mb-1">{task.title}</div>
+                      <div className="flex gap-2 text-xs">
+                        <span className={`px-2 py-0.5 rounded ${
+                          task.company === 'Muncho' ? 'bg-blue-100 text-blue-800' :
+                          task.company === 'Foan' ? 'bg-green-100 text-green-800' :
+                          'bg-purple-100 text-purple-800'
+                        }`}>
+                          {task.company}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded ${
+                          task.status === 'done' ? 'bg-green-100 text-green-800' :
+                          task.status === 'review' ? 'bg-yellow-100 text-yellow-800' :
+                          task.status === 'inProgress' ? 'bg-blue-100 text-blue-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {task.status === 'inProgress' ? 'In Progress' :
+                           task.status === 'todo' ? 'To Do' :
+                           task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                        </span>
+                        {task.week && (
+                          <span className="px-2 py-0.5 rounded bg-gray-200 text-gray-700">
+                            Week {task.week}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

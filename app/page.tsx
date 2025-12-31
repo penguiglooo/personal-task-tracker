@@ -174,12 +174,27 @@ export default function DashboardPage() {
   };
 
   const createTask = async (weekNum: number | null, status: string) => {
+    // Auto-assign based on current filter
+    let autoAssignees: string[] = [];
+
+    if (isAdmin) {
+      // For admins: auto-assign if filtering by a specific user (not 'all', 'null', or 'kings')
+      if (userFilter !== 'all' && userFilter !== 'null' && userFilter !== 'kings' && TEAM_MEMBERS.includes(userFilter)) {
+        autoAssignees = [userFilter];
+      }
+    } else {
+      // For non-admin users: always auto-assign themselves
+      if (session?.user?.name) {
+        autoAssignees = [session.user.name];
+      }
+    }
+
     const newTask: Partial<Task> = {
       title: '',
       company: 'Muncho',
       week: weekNum,
       status: status as any,
-      assignees: [],
+      assignees: autoAssignees,
       dueDate: weekNum === null ? new Date().toISOString().split('T')[0] : getDefaultDateForWeek(weekNum),
       isBacklog: weekNum === null,
       createdAt: new Date().toISOString(),

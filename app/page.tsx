@@ -19,6 +19,16 @@ interface Subtask {
   assignee: string | null;
 }
 
+interface Attachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  uploadedAt: string;
+  uploadedBy: string;
+}
+
 interface Task {
   _id: string;
   id: string;
@@ -31,6 +41,7 @@ interface Task {
   dueDate: string;
   comments: Comment[];
   subtasks?: Subtask[];
+  attachments?: Attachment[];
   isBacklog?: boolean;
   createdAt: string;
   difficulty?: 'Easy' | 'Medium' | 'Hard';
@@ -892,6 +903,11 @@ function TaskCard({
           💬 {task.comments.length} comment{task.comments.length !== 1 ? 's' : ''}
         </div>
       )}
+      {task.attachments && task.attachments.length > 0 && (
+        <div className="mt-2 text-xs text-gray-500">
+          📎 {task.attachments.length} file{task.attachments.length !== 1 ? 's' : ''}
+        </div>
+      )}
       {task.subtasks && task.subtasks.length > 0 && (
         <div className="mt-2">
           <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
@@ -1560,6 +1576,12 @@ function WeekView({
                         </div>
                       )}
 
+                      {task.attachments && task.attachments.length > 0 && (
+                        <div className="text-xs text-gray-600 bg-white bg-opacity-60 px-2 py-1 rounded">
+                          📎 {task.attachments.length} file{task.attachments.length !== 1 ? 's' : ''}
+                        </div>
+                      )}
+
                       {task.subtasks && task.subtasks.length > 0 && (
                         <div className="pt-1">
                           <div className="flex items-center justify-between text-xs text-gray-600 mb-1.5">
@@ -1610,6 +1632,9 @@ function TaskModal({
   const [isSaving, setIsSaving] = useState(false);
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
   const [newSubtask, setNewSubtask] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1719,6 +1744,152 @@ function TaskModal({
     if (day <= 15) return 2;
     if (day <= 23) return 3;
     return 4;
+  };
+
+  const compressImage = async (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Max dimensions
+          const MAX_WIDTH = 1920;
+          const MAX_HEIGHT = 1920;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const compressedFile = new File([blob], file.name, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now(),
+                });
+                resolve(compressedFile);
+              } else {
+                reject(new Error('Compression failed'));
+              }
+            },
+            'image/jpeg',
+            0.8 // 80% quality
+          );
+        };
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        let fileToUpload = files[i];
+
+        // Compress images before upload
+        if (fileToUpload.type.startsWith('image/')) {
+          try {
+            fileToUpload = await compressImage(fileToUpload);
+          } catch (err) {
+            console.error('Image compression failed, uploading original:', err);
+          }
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileToUpload);
+        formData.append('taskId', task.id);
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error('Upload failed');
+        }
+
+        const { attachment } = await response.json();
+
+        setEditedTask(prev => ({
+          ...prev,
+          attachments: [...(prev.attachments || []), attachment]
+        }));
+
+        setUploadProgress(((i + 1) / files.length) * 100);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload files. Please try again.');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    if (!confirm('Are you sure you want to delete this attachment?')) return;
+
+    try {
+      const response = await fetch(`/api/upload?taskId=${task.id}&attachmentId=${attachmentId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Delete failed');
+      }
+
+      setEditedTask(prev => ({
+        ...prev,
+        attachments: prev.attachments?.filter(att => att.id !== attachmentId) || []
+      }));
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Failed to delete attachment. Please try again.');
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const getFileIcon = (type: string): string => {
+    if (type.startsWith('image/')) return '🖼️';
+    if (type.includes('pdf')) return '📄';
+    if (type.includes('word') || type.includes('document')) return '📝';
+    if (type.includes('sheet') || type.includes('excel')) return '📊';
+    if (type.includes('video')) return '🎥';
+    return '📎';
   };
 
   return (
@@ -2021,6 +2192,96 @@ function TaskModal({
                 >
                   Add
                 </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Attachments</label>
+
+              {/* Display existing attachments */}
+              {editedTask.attachments && editedTask.attachments.length > 0 && (
+                <div className="space-y-2 mb-3">
+                  {editedTask.attachments.map(attachment => (
+                    <div key={attachment.id} className="bg-gray-50 p-3 rounded border border-gray-200 flex items-center gap-3">
+                      {/* Preview for images */}
+                      {attachment.type.startsWith('image/') ? (
+                        <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                          <img
+                            src={attachment.url}
+                            alt={attachment.name}
+                            className="w-16 h-16 object-cover rounded border border-gray-300 hover:opacity-80 cursor-pointer"
+                          />
+                        </a>
+                      ) : (
+                        <div className="w-16 h-16 flex items-center justify-center bg-gray-200 rounded border border-gray-300 text-3xl">
+                          {getFileIcon(attachment.type)}
+                        </div>
+                      )}
+
+                      {/* File info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">{attachment.name}</div>
+                        <div className="text-xs text-gray-500">
+                          {formatFileSize(attachment.size)} • Uploaded by {attachment.uploadedBy}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {new Date(attachment.uploadedAt).toLocaleString()}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 shrink-0">
+                        <a
+                          href={attachment.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                          View
+                        </a>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDeleteAttachment(attachment.id)}
+                            className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Upload button and progress */}
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="w-full px-4 py-2 bg-gray-100 border-2 border-dashed border-gray-300 text-gray-700 rounded-lg hover:bg-gray-200 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isUploading ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      Uploading... {Math.round(uploadProgress)}%
+                    </>
+                  ) : (
+                    <>
+                      📎 Click to attach files or drag & drop
+                    </>
+                  )}
+                </button>
+                <div className="mt-1 text-xs text-gray-500">
+                  Supported: Images (auto-compressed), PDFs, Documents • Max 50MB per file
+                </div>
               </div>
             </div>
 

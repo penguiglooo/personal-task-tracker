@@ -23,6 +23,7 @@ interface Task {
   _id: string;
   id: string;
   title: string;
+  description?: string;
   company: 'Muncho' | 'Foan' | 'Both';
   week: number | null;
   status: 'todo' | 'inProgress' | 'review' | 'done';
@@ -996,20 +997,95 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
     return difficultyWeight * importanceWeight;
   };
 
+  // Calculate performance score (0-100)
+  const calculatePerformanceScore = (
+    completedWeight: number,
+    totalWeight: number,
+    completedTasks: number,
+    totalTasks: number,
+    inProgressCount: number,
+    reviewCount: number,
+    subtaskCompletionRate: number
+  ) => {
+    if (totalTasks === 0) return 0;
+
+    // Weighted completion is the primary factor (60% of score)
+    const weightedCompletion = totalWeight > 0 ? (completedWeight / totalWeight) * 60 : 0;
+
+    // Task completion count factor (20% of score)
+    const taskCompletion = (completedTasks / totalTasks) * 20;
+
+    // Progress momentum (10% of score) - reward having tasks in progress/review
+    const progressMomentum = totalTasks > 0
+      ? ((inProgressCount + reviewCount) / totalTasks) * 10
+      : 0;
+
+    // Subtask completion (10% of score)
+    const subtaskFactor = (subtaskCompletionRate / 100) * 10;
+
+    const score = weightedCompletion + taskCompletion + progressMomentum + subtaskFactor;
+    return Math.min(100, Math.round(score));
+  };
+
+  // Get grade letter from score
+  const getGrade = (score: number): { letter: string; color: string } => {
+    if (score >= 95) return { letter: 'A+', color: 'text-green-700 bg-green-100' };
+    if (score >= 90) return { letter: 'A', color: 'text-green-700 bg-green-100' };
+    if (score >= 85) return { letter: 'A-', color: 'text-green-600 bg-green-50' };
+    if (score >= 80) return { letter: 'B+', color: 'text-blue-700 bg-blue-100' };
+    if (score >= 75) return { letter: 'B', color: 'text-blue-700 bg-blue-100' };
+    if (score >= 70) return { letter: 'B-', color: 'text-blue-600 bg-blue-50' };
+    if (score >= 65) return { letter: 'C+', color: 'text-yellow-700 bg-yellow-100' };
+    if (score >= 60) return { letter: 'C', color: 'text-yellow-700 bg-yellow-100' };
+    if (score >= 55) return { letter: 'C-', color: 'text-yellow-600 bg-yellow-50' };
+    if (score >= 50) return { letter: 'D', color: 'text-orange-700 bg-orange-100' };
+    return { letter: 'F', color: 'text-red-700 bg-red-100' };
+  };
+
   // Calculate metrics for each employee
   const employeeMetrics = TEAM_MEMBERS.map(member => {
     const memberTasks = tasks.filter(t => t.assignees && t.assignees.includes(member));
 
-    // Weekly breakdown
+    // Weekly breakdown with scores
     const weeklyData = [1, 2, 3, 4].map(weekNum => {
       const weekTasks = memberTasks.filter(t => t.week === weekNum);
+      const weekTotal = weekTasks.length;
+      const weekCompleted = weekTasks.filter(t => t.status === 'done').length;
+      const weekInProgress = weekTasks.filter(t => t.status === 'inProgress').length;
+      const weekReview = weekTasks.filter(t => t.status === 'review').length;
+      const weekTodo = weekTasks.filter(t => t.status === 'todo').length;
+
+      const weekTotalWeight = weekTasks.reduce((sum, task) => sum + getTaskWeight(task), 0);
+      const weekCompletedWeight = weekTasks
+        .filter(t => t.status === 'done')
+        .reduce((sum, task) => sum + getTaskWeight(task), 0);
+
+      const weekSubtasks = weekTasks.flatMap(t => t.subtasks || []);
+      const weekSubtaskCompletion = weekSubtasks.length > 0
+        ? (weekSubtasks.filter(st => st.completed).length / weekSubtasks.length * 100)
+        : 0;
+
+      const weekScore = calculatePerformanceScore(
+        weekCompletedWeight,
+        weekTotalWeight,
+        weekCompleted,
+        weekTotal,
+        weekInProgress,
+        weekReview,
+        weekSubtaskCompletion
+      );
+
       return {
         week: weekNum,
-        total: weekTasks.length,
-        completed: weekTasks.filter(t => t.status === 'done').length,
-        inProgress: weekTasks.filter(t => t.status === 'inProgress').length,
-        review: weekTasks.filter(t => t.status === 'review').length,
-        todo: weekTasks.filter(t => t.status === 'todo').length
+        total: weekTotal,
+        completed: weekCompleted,
+        inProgress: weekInProgress,
+        review: weekReview,
+        todo: weekTodo,
+        totalWeight: weekTotalWeight,
+        completedWeight: weekCompletedWeight,
+        score: weekScore,
+        grade: getGrade(weekScore)
       };
     });
 
@@ -1034,6 +1110,20 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
     const completedSubtasks = allSubtasks.filter(st => st.completed).length;
     const subtaskCompletionRate = allSubtasks.length > 0 ? (completedSubtasks / allSubtasks.length * 100).toFixed(1) : '0.0';
 
+    const inProgressCount = memberTasks.filter(t => t.status === 'inProgress').length;
+    const reviewCount = memberTasks.filter(t => t.status === 'review').length;
+
+    // Calculate monthly score
+    const monthlyScore = calculatePerformanceScore(
+      completedWeight,
+      totalWeight,
+      completedTasks,
+      totalTasks,
+      inProgressCount,
+      reviewCount,
+      parseFloat(subtaskCompletionRate)
+    );
+
     return {
       name: member,
       totalTasks,
@@ -1045,18 +1135,20 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
       weeklyData,
       munchoTaskCount: munchoTasks.length,
       foanTaskCount: foanTasks.length,
-      inProgressCount: memberTasks.filter(t => t.status === 'inProgress').length,
-      reviewCount: memberTasks.filter(t => t.status === 'review').length,
+      inProgressCount,
+      reviewCount,
       todoCount: memberTasks.filter(t => t.status === 'todo').length,
       subtaskTotal: allSubtasks.length,
       subtaskCompleted: completedSubtasks,
       subtaskCompletionRate: parseFloat(subtaskCompletionRate),
-      tasks: memberTasks
+      tasks: memberTasks,
+      monthlyScore,
+      monthlyGrade: getGrade(monthlyScore)
     };
   });
 
-  // Sort by completion rate
-  const sortedEmployees = [...employeeMetrics].sort((a, b) => b.completionRate - a.completionRate);
+  // Sort by monthly score
+  const sortedEmployees = [...employeeMetrics].sort((a, b) => b.monthlyScore - a.monthlyScore);
 
   const selectedEmpData = selectedEmployee ? employeeMetrics.find(e => e.name === selectedEmployee) : null;
 
@@ -1090,22 +1182,36 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
 
       {/* Employee Performance Table */}
       <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Employee Performance Summary</h3>
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Employee Performance Rankings</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b-2 border-gray-200">
+                <th className="text-left py-3 px-4 font-semibold text-gray-700">Rank</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Employee</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700">Total Tasks</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700">Monthly Score</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700">Grade</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700">Tasks</th>
                 <th className="text-center py-3 px-4 font-semibold text-gray-700">Completed</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700">Task Weight</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700">Weighted %</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700">Weight</th>
                 <th className="text-center py-3 px-4 font-semibold text-gray-700">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {sortedEmployees.map(emp => (
+              {sortedEmployees.map((emp, index) => (
                 <tr key={emp.name} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="py-3 px-4">
+                    <div className="flex items-center justify-center">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                        index === 0 ? 'bg-yellow-400 text-yellow-900' :
+                        index === 1 ? 'bg-gray-300 text-gray-800' :
+                        index === 2 ? 'bg-orange-300 text-orange-900' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {index + 1}
+                      </span>
+                    </div>
+                  </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-gray-800 text-white flex items-center justify-center font-semibold">
@@ -1114,26 +1220,31 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
                       <span className="font-medium text-gray-900">{emp.name}</span>
                     </div>
                   </td>
+                  <td className="text-center py-3 px-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-24 bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-gray-800 h-2 rounded-full transition-all"
+                          style={{ width: `${emp.monthlyScore}%` }}
+                        />
+                      </div>
+                      <span className="font-bold text-gray-900 text-lg">{emp.monthlyScore}</span>
+                    </div>
+                  </td>
+                  <td className="text-center py-3 px-4">
+                    <span className={`px-3 py-1 rounded-lg font-bold text-sm ${emp.monthlyGrade.color}`}>
+                      {emp.monthlyGrade.letter}
+                    </span>
+                  </td>
                   <td className="text-center py-3 px-4 text-gray-700">{emp.totalTasks}</td>
                   <td className="text-center py-3 px-4">
-                    <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded font-medium">
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded font-medium text-sm">
                       {emp.completedTasks}
                     </span>
                   </td>
                   <td className="text-center py-3 px-4">
                     <div className="text-xs text-gray-600">
                       {emp.completedWeight}/{emp.totalWeight}
-                    </div>
-                  </td>
-                  <td className="text-center py-3 px-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-20 bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-gray-800 h-2 rounded-full"
-                          style={{ width: `${emp.weightedCompletionRate}%` }}
-                        />
-                      </div>
-                      <span className="font-semibold text-gray-900">{emp.weightedCompletionRate}%</span>
                     </div>
                   </td>
                   <td className="text-center py-3 px-4">
@@ -1167,29 +1278,64 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
             </button>
           </div>
 
+          {/* Monthly Performance Summary */}
+          <div className="mb-6 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-6 border-2 border-gray-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-1">Monthly Performance Score</h4>
+                <p className="text-sm text-gray-600">Overall rating for January 2025</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-center">
+                  <div className="text-5xl font-bold text-gray-900 mb-1">{selectedEmpData.monthlyScore}</div>
+                  <div className="text-xs text-gray-600">Score</div>
+                </div>
+                <div className="text-center">
+                  <div className={`text-5xl font-bold px-6 py-3 rounded-lg ${selectedEmpData.monthlyGrade.color}`}>
+                    {selectedEmpData.monthlyGrade.letter}
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">Grade</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Weekly Performance */}
           <div className="mb-6">
-            <h4 className="text-lg font-semibold text-gray-900 mb-3">Weekly Performance</h4>
+            <h4 className="text-lg font-semibold text-gray-900 mb-3">Weekly Performance Breakdown</h4>
             <div className="grid grid-cols-4 gap-4">
               {selectedEmpData.weeklyData.map(week => (
                 <div key={week.week} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="text-sm font-medium text-gray-600 mb-2">Week {week.week}</div>
-                  <div className="space-y-1 text-sm">
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="text-sm font-medium text-gray-600">Week {week.week}</div>
+                    <span className={`px-2 py-1 rounded text-xs font-bold ${week.grade.color}`}>
+                      {week.grade.letter}
+                    </span>
+                  </div>
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-600">Score</span>
+                      <span className="text-sm font-bold text-gray-900">{week.score}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-gray-800 h-2 rounded-full transition-all"
+                        style={{ width: `${week.score}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1 text-sm border-t border-gray-300 pt-2">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Total:</span>
                       <span className="font-semibold">{week.total}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Done:</span>
-                      <span className="font-semibold">{week.completed}</span>
+                      <span className="font-semibold text-green-700">{week.completed}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">In Progress:</span>
-                      <span className="font-semibold">{week.inProgress}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Review:</span>
-                      <span className="font-semibold">{week.review}</span>
+                      <span className="text-gray-600">Weight:</span>
+                      <span className="font-semibold text-xs">{week.completedWeight}/{week.totalWeight}</span>
                     </div>
                   </div>
                 </div>
@@ -1555,6 +1701,18 @@ function TaskModal({
                 value={editedTask.title}
                 onChange={(e) => setEditedTask({...editedTask, title: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                disabled={!isAdmin}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                value={editedTask.description || ''}
+                onChange={(e) => setEditedTask({...editedTask, description: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 resize-none"
+                rows={4}
+                placeholder="Add a detailed description..."
                 disabled={!isAdmin}
               />
             </div>

@@ -843,7 +843,7 @@ function TaskCard({
       </div>
       {task.assignees && task.assignees.length > 0 && (
         <div className="text-xs mb-2">
-          <span className="bg-gray-100 px-2 py-1 rounded">
+          <span className="bg-gray-100 text-gray-900 px-2 py-1 rounded">
             {task.assignees.join(', ')}
           </span>
         </div>

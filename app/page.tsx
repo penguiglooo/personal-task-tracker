@@ -228,7 +228,7 @@ export default function DashboardPage() {
   const getDefaultDateForWeek = (weekNum: number) => {
     const startDays = [1, 8, 16, 24];
     const day = startDays[weekNum - 1];
-    return `2025-01-${String(day).padStart(2, '0')}`;
+    return `2026-01-${String(day).padStart(2, '0')}`;
   };
 
   const deleteTask = async (taskId: string) => {
@@ -507,7 +507,7 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto">
         <header className="mb-6 flex justify-between items-start">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">January Dashboard</h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">January 2026 Dashboard</h1>
             <p className="text-gray-600">Muncho & Foan Command Center</p>
             <p className="text-sm text-gray-500 mt-1">
               Logged in as {session?.user?.name} ({isAdmin ? 'Admin' : 'Viewer'})
@@ -886,11 +886,11 @@ function CalendarView({
   const calendarDays: DateObj[] = [];
 
   for (let day = 29; day <= 31; day++) {
-    calendarDays.push({ month: 12, day, year: 2024 });
+    calendarDays.push({ month: 12, day, year: 2025 });
   }
 
   for (let day = 1; day <= 31; day++) {
-    calendarDays.push({ month: 1, day, year: 2025 });
+    calendarDays.push({ month: 1, day, year: 2026 });
   }
 
   const weeks: DateObj[][] = [];
@@ -938,7 +938,7 @@ function CalendarView({
 
   return (
     <div className="bg-white rounded-lg p-6">
-      <h2 className="text-2xl font-bold mb-6">December 2024 - January 2025</h2>
+      <h2 className="text-2xl font-bold mb-6">December 2025 - January 2026</h2>
       <div className="grid grid-cols-7 gap-2">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
           <div key={day} className="font-bold text-center p-2">{day}</div>
@@ -1157,7 +1157,7 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
       {/* Header */}
       <div className="bg-white rounded-lg p-6 border border-gray-200">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Team Analytics</h2>
-        <p className="text-gray-600">January 2025 Performance Overview</p>
+        <p className="text-gray-600">January 2026 Performance Overview</p>
       </div>
 
       {/* Overall Summary Cards */}
@@ -1268,7 +1268,7 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
           <div className="flex justify-between items-start mb-6">
             <div>
               <h3 className="text-2xl font-bold text-gray-900 mb-1">{selectedEmpData.name} - Detailed Analysis</h3>
-              <p className="text-gray-600">Complete performance breakdown for January 2025</p>
+              <p className="text-gray-600">Complete performance breakdown for January 2026</p>
             </div>
             <button
               onClick={() => setSelectedEmployee(null)}
@@ -1283,7 +1283,7 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-lg font-semibold text-gray-900 mb-1">Monthly Performance Score</h4>
-                <p className="text-sm text-gray-600">Overall rating for January 2025</p>
+                <p className="text-sm text-gray-600">Overall rating for January 2026</p>
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-center">
@@ -1426,12 +1426,12 @@ function WeekView({
 
   // Generate the 7 days for the selected week
   for (let day = range.start; day <= range.end; day++) {
-    const date = new Date(2025, 0, day); // January is month 0
+    const date = new Date(2026, 0, day); // January is month 0
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     weekDays.push({
       month: 1,
       day,
-      year: 2025,
+      year: 2026,
       dayName: dayNames[date.getDay()]
     });
   }
@@ -1462,7 +1462,7 @@ function WeekView({
 
   return (
     <div className="bg-white rounded-lg p-6">
-      <h2 className="text-2xl font-bold mb-6">Week {weekNumber} - January {range.start}-{range.end}, 2025</h2>
+      <h2 className="text-2xl font-bold mb-6">Week {weekNumber} - January {range.start}-{range.end}, 2026</h2>
       <div className="grid grid-cols-7 gap-4">
         {weekDays.map((dateObj) => {
           const dateStr = `${dateObj.year}-${String(dateObj.month).padStart(2, '0')}-${String(dateObj.day).padStart(2, '0')}`;

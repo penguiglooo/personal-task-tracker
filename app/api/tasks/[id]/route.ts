@@ -52,6 +52,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (updates.isBacklog !== undefined) updateData.is_backlog = updates.isBacklog;
     if (updates.comments) updateData.comments = updates.comments;
     if (updates.subtasks !== undefined) updateData.subtasks = updates.subtasks;
+    if (updates.activityLog !== undefined) updateData.activity_log = updates.activityLog;
 
     const { data: updated, error } = await supabaseAdmin.from('tasks').update(updateData).eq('task_id', id).select().single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -68,6 +69,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       dueDate: updated.due_date,
       comments: updated.comments || [],
       subtasks: updated.subtasks || [],
+      activityLog: updated.activity_log || [],
       isBacklog: updated.is_backlog || updated.week === null,
       createdAt: updated.created_at || updated.due_date
     });

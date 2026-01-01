@@ -618,6 +618,54 @@ export default function DashboardPage() {
 
   const renderBacklog = () => {
     const backlogTasks = filteredTasks.filter(t => t.week === null || t.isBacklog);
+    const munchoTasks = backlogTasks.filter(t => t.company === 'Muncho' || t.company === 'Both');
+    const foanTasks = backlogTasks.filter(t => t.company === 'Foan' || t.company === 'Both');
+
+    const renderBacklogCard = (task: Task) => (
+      <div
+        key={task.id}
+        onClick={() => setSelectedTask(task)}
+        className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md cursor-pointer transition-all hover:border-gray-300"
+      >
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <h3 className="font-semibold text-gray-900 text-sm leading-tight flex-1">{task.title || '(No title)'}</h3>
+          {task.importance && (
+            <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
+              task.importance === 'Low' ? 'bg-gray-100 text-gray-700' :
+              task.importance === 'Medium' ? 'bg-blue-100 text-blue-700' :
+              task.importance === 'High' ? 'bg-orange-100 text-orange-700' :
+              'bg-red-100 text-red-800'
+            }`}>
+              {task.importance === 'Critical' ? '⚠️' : task.importance.charAt(0)}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5 text-xs">
+          <span className={`px-1.5 py-0.5 rounded ${
+            task.status === 'done' ? 'bg-green-100 text-green-800' :
+            task.status === 'review' ? 'bg-yellow-100 text-yellow-800' :
+            task.status === 'inProgress' ? 'bg-blue-100 text-blue-800' :
+            'bg-gray-100 text-gray-800'
+          }`}>
+            {STATUS_LABELS[task.status]}
+          </span>
+          {task.difficulty && (
+            <span className={`px-1.5 py-0.5 rounded ${
+              task.difficulty === 'Easy' ? 'bg-green-100 text-green-700' :
+              task.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+              'bg-red-100 text-red-700'
+            }`}>
+              {task.difficulty.charAt(0)}
+            </span>
+          )}
+          {task.assignees && task.assignees.length > 0 && (
+            <span className="bg-gray-100 text-gray-900 px-1.5 py-0.5 rounded">
+              👤 {task.assignees.join(', ')}
+            </span>
+          )}
+        </div>
+      </div>
+    );
 
     return (
       <div className="bg-white rounded-lg p-6 border border-gray-200">
@@ -641,72 +689,42 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="space-y-3">
-          {backlogTasks.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              No tasks in backlog
-            </div>
-          ) : (
-            backlogTasks.map(task => (
-              <div
-                key={task.id}
-                onClick={() => setSelectedTask(task)}
-                className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:bg-gray-100 cursor-pointer transition-colors"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 mb-2">{task.title || '(No title)'}</h3>
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      <span className={`px-2 py-1 rounded ${
-                        task.company === 'Muncho' ? 'bg-blue-100 text-blue-800' :
-                        task.company === 'Foan' ? 'bg-green-100 text-green-800' :
-                        'bg-purple-100 text-purple-800'
-                      }`}>
-                        {task.company}
-                      </span>
-                      <span className={`px-2 py-1 rounded ${
-                        task.status === 'done' ? 'bg-green-100 text-green-800' :
-                        task.status === 'review' ? 'bg-yellow-100 text-yellow-800' :
-                        task.status === 'inProgress' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {STATUS_LABELS[task.status]}
-                      </span>
-                      {task.difficulty && (
-                        <span className={`px-2 py-1 rounded font-medium ${
-                          task.difficulty === 'Easy' ? 'bg-green-100 text-green-700' :
-                          task.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
-                          {task.difficulty}
-                        </span>
-                      )}
-                      {task.importance && (
-                        <span className={`px-2 py-1 rounded font-medium ${
-                          task.importance === 'Low' ? 'bg-gray-100 text-gray-700' :
-                          task.importance === 'Medium' ? 'bg-blue-100 text-blue-700' :
-                          task.importance === 'High' ? 'bg-orange-100 text-orange-700' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {task.importance === 'Critical' ? '⚠️ Critical' : task.importance}
-                        </span>
-                      )}
-                      {task.assignees && task.assignees.length > 0 && (
-                        <span className="bg-gray-100 text-gray-900 px-2 py-1 rounded">
-                          👤 {task.assignees.join(', ')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {isAdmin && (
-                    <div className="text-sm text-gray-500 whitespace-nowrap">
-                      Click to assign week →
-                    </div>
-                  )}
+        <div className="grid grid-cols-2 gap-6">
+          {/* Muncho Backlog */}
+          <div>
+            <h3 className="text-lg font-semibold text-blue-900 mb-3 flex items-center gap-2">
+              <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
+              Muncho Backlog
+              <span className="text-sm font-normal text-gray-500">({munchoTasks.length})</span>
+            </h3>
+            <div className="space-y-2">
+              {munchoTasks.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">
+                  No Muncho tasks in backlog
                 </div>
-              </div>
-            ))
-          )}
+              ) : (
+                munchoTasks.map(renderBacklogCard)
+              )}
+            </div>
+          </div>
+
+          {/* Foan Backlog */}
+          <div>
+            <h3 className="text-lg font-semibold text-green-900 mb-3 flex items-center gap-2">
+              <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+              Foan Backlog
+              <span className="text-sm font-normal text-gray-500">({foanTasks.length})</span>
+            </h3>
+            <div className="space-y-2">
+              {foanTasks.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">
+                  No Foan tasks in backlog
+                </div>
+              ) : (
+                foanTasks.map(renderBacklogCard)
+              )}
+            </div>
+          </div>
         </div>
       </div>
     );

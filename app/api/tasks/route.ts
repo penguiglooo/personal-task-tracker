@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
       dueDate: task.due_date,
       comments: task.comments || [],
       subtasks: task.subtasks || [],
+      activityLog: task.activity_log || [],
       isBacklog: task.is_backlog || task.week === null,
       createdAt: task.created_at || task.due_date
     }));
@@ -63,6 +64,12 @@ export async function POST(request: NextRequest) {
       due_date: taskData.dueDate,
       comments: [],
       subtasks: [],
+      activity_log: [{
+        id: `${Date.now()}-created`,
+        timestamp: new Date().toISOString(),
+        user: 'System',
+        action: 'created task'
+      }],
       is_backlog: taskData.isBacklog || taskData.week === null,
       created_at: taskData.createdAt || new Date().toISOString()
     };
@@ -84,6 +91,7 @@ export async function POST(request: NextRequest) {
       dueDate: data.due_date,
       comments: data.comments || [],
       subtasks: data.subtasks || [],
+      activityLog: data.activity_log || [],
       isBacklog: data.is_backlog || data.week === null,
       createdAt: data.created_at
     });

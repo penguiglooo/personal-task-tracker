@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   start_date TIMESTAMPTZ,
   due_date TIMESTAMPTZ NOT NULL,
   comments JSONB DEFAULT '[]'::jsonb,
+  activity_log JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

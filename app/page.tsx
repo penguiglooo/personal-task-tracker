@@ -29,6 +29,18 @@ interface Attachment {
   uploadedBy: string;
 }
 
+interface ActivityLog {
+  id: string;
+  timestamp: string;
+  user: string;
+  action: string;
+  changes?: {
+    field: string;
+    oldValue: any;
+    newValue: any;
+  };
+}
+
 interface Task {
   _id: string;
   id: string;
@@ -43,6 +55,7 @@ interface Task {
   comments: Comment[];
   subtasks?: Subtask[];
   attachments?: Attachment[];
+  activityLog?: ActivityLog[];
   isBacklog?: boolean;
   createdAt: string;
   difficulty?: 'Easy' | 'Medium' | 'Hard';
@@ -68,7 +81,7 @@ export default function DashboardPage() {
   const [selectedWeekForWeekView, setSelectedWeekForWeekView] = useState(1);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userFilter, setUserFilter] = useState<string>('all');
+  const [userFilter, setUserFilter] = useState<string[]>([]);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [newTaskStatus, setNewTaskStatus] = useState<string>('todo');
   const [showResetPassword, setShowResetPassword] = useState(false);
@@ -94,17 +107,22 @@ export default function DashboardPage() {
 
   useEffect(() => {
     // Apply user filter for admins
-    if (userFilter === 'all') {
+    if (userFilter.length === 0) {
+      // No filter selected, show all tasks
       setFilteredTasks(tasks);
-    } else if (userFilter === 'null') {
-      setFilteredTasks(tasks.filter(task => !task.assignees || task.assignees.length === 0));
-    } else if (userFilter === 'kings') {
-      const kings = ['Dhruv', 'Swapnil', 'Akaash'];
-      setFilteredTasks(tasks.filter(task =>
-        task.assignees && task.assignees.some(assignee => kings.includes(assignee))
-      ));
     } else {
-      setFilteredTasks(tasks.filter(task => task.assignees && task.assignees.includes(userFilter)));
+      // Filter tasks that have at least one assignee matching the selected filters
+      setFilteredTasks(tasks.filter(task => {
+        // Handle 'null' filter for unassigned tasks
+        if (userFilter.includes('null')) {
+          if (!task.assignees || task.assignees.length === 0) return true;
+        }
+        // Check if task has any of the selected assignees
+        if (task.assignees && task.assignees.some(assignee => userFilter.includes(assignee))) {
+          return true;
+        }
+        return false;
+      }));
     }
   }, [userFilter, tasks]);
 
@@ -125,12 +143,193 @@ export default function DashboardPage() {
 
   const updateTask = async (taskId: string, updates: Partial<Task>, closeModal: boolean = false) => {
     try {
+      // Find the current task to track changes
+      const currentTask = tasks.find(t => t.id === taskId);
+      const userName = session?.user?.name || 'Unknown';
+
+      // Generate activity logs for changes
+      const newActivityLogs: ActivityLog[] = [];
+
+      if (currentTask) {
+        // Track status changes
+        if (updates.status && updates.status !== currentTask.status) {
+          newActivityLogs.push({
+            id: `${Date.now()}-status`,
+            timestamp: new Date().toISOString(),
+            user: userName,
+            action: `moved task from ${STATUS_LABELS[currentTask.status]} to ${STATUS_LABELS[updates.status]}`,
+            changes: {
+              field: 'Status',
+              oldValue: STATUS_LABELS[currentTask.status],
+              newValue: STATUS_LABELS[updates.status]
+            }
+          });
+        }
+
+        // Track week changes
+        if (updates.week !== undefined && updates.week !== currentTask.week) {
+          newActivityLogs.push({
+            id: `${Date.now()}-week`,
+            timestamp: new Date().toISOString(),
+            user: userName,
+            action: `moved task from Week ${currentTask.week || 'Backlog'} to Week ${updates.week || 'Backlog'}`,
+            changes: {
+              field: 'Week',
+              oldValue: currentTask.week || 'Backlog',
+              newValue: updates.week || 'Backlog'
+            }
+          });
+        }
+
+        // Track assignee changes
+        if (updates.assignees && JSON.stringify(updates.assignees) !== JSON.stringify(currentTask.assignees)) {
+          newActivityLogs.push({
+            id: `${Date.now()}-assignees`,
+            timestamp: new Date().toISOString(),
+            user: userName,
+            action: `changed assignees`,
+            changes: {
+              field: 'Assignees',
+              oldValue: currentTask.assignees.join(', ') || 'None',
+              newValue: updates.assignees.join(', ') || 'None'
+            }
+          });
+        }
+
+        // Track subtask changes
+        if (updates.subtasks && JSON.stringify(updates.subtasks) !== JSON.stringify(currentTask.subtasks)) {
+          const oldCompleted = (currentTask.subtasks || []).filter(st => st.completed).length;
+          const newCompleted = (updates.subtasks || []).filter(st => st.completed).length;
+          if (oldCompleted !== newCompleted) {
+            newActivityLogs.push({
+              id: `${Date.now()}-subtasks`,
+              timestamp: new Date().toISOString(),
+              user: userName,
+              action: `updated subtask completion (${newCompleted}/${updates.subtasks.length} completed)`,
+            });
+          }
+        }
+
+        // Track title changes
+        if (updates.title && updates.title !== currentTask.title) {
+          newActivityLogs.push({
+            id: `${Date.now()}-title`,
+            timestamp: new Date().toISOString(),
+            user: userName,
+            action: `changed task title`,
+            changes: {
+              field: 'Title',
+              oldValue: currentTask.title,
+              newValue: updates.title
+            }
+          });
+        }
+
+        // Track company changes
+        if (updates.company && updates.company !== currentTask.company) {
+          newActivityLogs.push({
+            id: `${Date.now()}-company`,
+            timestamp: new Date().toISOString(),
+            user: userName,
+            action: `changed company`,
+            changes: {
+              field: 'Company',
+              oldValue: currentTask.company,
+              newValue: updates.company
+            }
+          });
+        }
+
+        // Track due date changes
+        if (updates.dueDate && updates.dueDate !== currentTask.dueDate) {
+          newActivityLogs.push({
+            id: `${Date.now()}-duedate`,
+            timestamp: new Date().toISOString(),
+            user: userName,
+            action: `changed due date`,
+            changes: {
+              field: 'Due Date',
+              oldValue: new Date(currentTask.dueDate).toLocaleDateString(),
+              newValue: new Date(updates.dueDate).toLocaleDateString()
+            }
+          });
+        }
+
+        // Track start date changes
+        if (updates.startDate !== undefined && updates.startDate !== currentTask.startDate) {
+          newActivityLogs.push({
+            id: `${Date.now()}-startdate`,
+            timestamp: new Date().toISOString(),
+            user: userName,
+            action: `changed start date`,
+            changes: {
+              field: 'Start Date',
+              oldValue: currentTask.startDate ? new Date(currentTask.startDate).toLocaleDateString() : 'None',
+              newValue: updates.startDate ? new Date(updates.startDate).toLocaleDateString() : 'None'
+            }
+          });
+        }
+
+        // Track difficulty changes
+        if (updates.difficulty && updates.difficulty !== currentTask.difficulty) {
+          newActivityLogs.push({
+            id: `${Date.now()}-difficulty`,
+            timestamp: new Date().toISOString(),
+            user: userName,
+            action: `changed difficulty`,
+            changes: {
+              field: 'Difficulty',
+              oldValue: currentTask.difficulty || 'Not set',
+              newValue: updates.difficulty
+            }
+          });
+        }
+
+        // Track importance changes
+        if (updates.importance && updates.importance !== currentTask.importance) {
+          newActivityLogs.push({
+            id: `${Date.now()}-importance`,
+            timestamp: new Date().toISOString(),
+            user: userName,
+            action: `changed importance`,
+            changes: {
+              field: 'Importance',
+              oldValue: currentTask.importance || 'Not set',
+              newValue: updates.importance
+            }
+          });
+        }
+
+        // Track comment additions
+        if (updates.comments && updates.comments.length > (currentTask.comments?.length || 0)) {
+          const newComment = updates.comments[updates.comments.length - 1];
+          newActivityLogs.push({
+            id: `${Date.now()}-comment`,
+            timestamp: new Date().toISOString(),
+            user: userName,
+            action: `added a comment`,
+          });
+        }
+      }
+
+      // Merge new activity logs with existing ones
+      const updatedActivityLog = [
+        ...(currentTask?.activityLog || []),
+        ...newActivityLogs
+      ];
+
+      // Add activity log to updates
+      const updatesWithLog = {
+        ...updates,
+        activityLog: updatedActivityLog
+      };
+
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updates),
+        body: JSON.stringify(updatesWithLog),
       });
 
       if (response.ok) {
@@ -165,17 +364,36 @@ export default function DashboardPage() {
 
       if (response.ok) {
         const newComment = await response.json();
+        const userName = session?.user?.name || 'Unknown';
+        const currentTask = tasks.find(t => t.id === taskId);
+
+        // Add activity log for comment
+        const commentActivityLog: ActivityLog = {
+          id: `${Date.now()}-comment`,
+          timestamp: new Date().toISOString(),
+          user: userName,
+          action: `added a comment: "${text.length > 50 ? text.substring(0, 50) + '...' : text}"`,
+        };
+
+        const updatedActivityLog = [
+          ...(currentTask?.activityLog || []),
+          commentActivityLog
+        ];
+
+        // Update task with new activity log
+        await updateTask(taskId, {
+          comments: [...(currentTask?.comments || []), newComment],
+          activityLog: updatedActivityLog
+        });
 
         // Optimistically update the selected task immediately
         if (selectedTask && selectedTask.id === taskId) {
           setSelectedTask({
             ...selectedTask,
-            comments: [...selectedTask.comments, newComment]
+            comments: [...selectedTask.comments, newComment],
+            activityLog: updatedActivityLog
           });
         }
-
-        // Also fetch all tasks to update the main state
-        await fetchTasks();
       } else {
         const error = await response.json();
         alert(error.error || 'Failed to add comment');
@@ -191,9 +409,10 @@ export default function DashboardPage() {
     let autoAssignees: string[] = [];
 
     if (isAdmin) {
-      // For admins: auto-assign if filtering by a specific user (not 'all', 'null', or 'kings')
-      if (userFilter !== 'all' && userFilter !== 'null' && userFilter !== 'kings' && TEAM_MEMBERS.includes(userFilter)) {
-        autoAssignees = [userFilter];
+      // For admins: auto-assign if filtering by specific users (excluding 'null')
+      const validFilters = userFilter.filter(f => f !== 'null' && TEAM_MEMBERS.includes(f));
+      if (validFilters.length > 0) {
+        autoAssignees = validFilters;
       }
     } else {
       // For non-admin users: always auto-assign themselves
@@ -584,21 +803,58 @@ export default function DashboardPage() {
 
         {isAdmin && (
           <div className="mb-6 bg-white rounded-lg p-4 shadow-sm">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Filter by User
-            </label>
-            <select
-              value={userFilter}
-              onChange={(e) => setUserFilter(e.target.value)}
-              className="px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-800 text-gray-900"
-            >
-              <option value="all">All Team Members</option>
-              <option value="kings">Kings (Dhruv, Swapnil, Akaash)</option>
+            <div className="flex justify-between items-center mb-3">
+              <label className="block text-sm font-medium text-gray-700">
+                Filter by Team Members
+              </label>
+              {userFilter.length > 0 && (
+                <button
+                  onClick={() => setUserFilter([])}
+                  className="text-xs text-gray-600 hover:text-gray-900 underline"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {TEAM_MEMBERS.map(member => (
-                <option key={member} value={member}>{member}</option>
+                <label key={member} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                  <input
+                    type="checkbox"
+                    checked={userFilter.includes(member)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setUserFilter([...userFilter, member]);
+                      } else {
+                        setUserFilter(userFilter.filter(f => f !== member));
+                      }
+                    }}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-900">{member}</span>
+                </label>
               ))}
-              <option value="null">Unassigned</option>
-            </select>
+              <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                <input
+                  type="checkbox"
+                  checked={userFilter.includes('null')}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setUserFilter([...userFilter, 'null']);
+                    } else {
+                      setUserFilter(userFilter.filter(f => f !== 'null'));
+                    }
+                  }}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-500 italic">Unassigned</span>
+              </label>
+            </div>
+            {userFilter.length > 0 && (
+              <div className="mt-3 text-xs text-gray-600">
+                Showing tasks for: {userFilter.map(f => f === 'null' ? 'Unassigned' : f).join(', ')}
+              </div>
+            )}
           </div>
         )}
 
@@ -636,16 +892,26 @@ export default function DashboardPage() {
               Week {week} ({[1,8,16,24][week-1]}-{[7,15,23,31][week-1]} Jan)
             </button>
           ))}
+          <button
+            onClick={() => setView('analytics')}
+            className={`px-4 py-2 rounded-lg font-medium ${
+              view === 'analytics'
+                ? 'bg-blue-600 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            📊 Analytics
+          </button>
           {isAdmin && (
             <button
-              onClick={() => setView('analytics')}
+              onClick={() => setView('changelog')}
               className={`px-4 py-2 rounded-lg font-medium ${
-                view === 'analytics'
-                  ? 'bg-blue-600 text-white'
+                view === 'changelog'
+                  ? 'bg-indigo-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-100'
               }`}
             >
-              📊 Analytics
+              📝 Changelog
             </button>
           )}
         </div>
@@ -712,7 +978,9 @@ export default function DashboardPage() {
               )}
             </>
           ) : view === 'analytics' ? (
-            <AnalyticsView tasks={tasks} />
+            <AnalyticsView tasks={tasks} currentUserName={(session?.user as any)?.name} isAdmin={isAdmin} />
+          ) : view === 'changelog' ? (
+            <ChangelogView tasks={tasks} />
           ) : view === 'backlog' ? (
             renderBacklog()
           ) : (
@@ -970,14 +1238,14 @@ function CalendarView({
 
   // Helper to check if a date is between start and due date (inclusive)
   const isDateInTaskRange = (dateStr: string, task: Task) => {
-    const taskStart = task.startDate || task.dueDate;
-    const taskEnd = task.dueDate;
+    const taskStart = (task.startDate || task.dueDate).split('T')[0];
+    const taskEnd = task.dueDate.split('T')[0];
     return dateStr >= taskStart && dateStr <= taskEnd;
   };
 
   // Helper to determine if this is the first day of a multi-day task in this week
   const isFirstDayInWeek = (dateStr: string, task: Task, week: DateObj[]) => {
-    const taskStart = task.startDate || task.dueDate;
+    const taskStart = (task.startDate || task.dueDate).split('T')[0];
     if (dateStr !== taskStart) {
       // Check if start date is in a previous week
       const dateIndex = week.findIndex(d => d.dateStr === dateStr);
@@ -992,7 +1260,7 @@ function CalendarView({
 
   // Helper to determine if this is the last day of a multi-day task in this week
   const isLastDayInWeek = (dateStr: string, task: Task, week: DateObj[]) => {
-    const taskEnd = task.dueDate;
+    const taskEnd = task.dueDate.split('T')[0];
     if (dateStr !== taskEnd) {
       // Check if end date is in a later week
       const dateIndex = week.findIndex(d => d.dateStr === dateStr);
@@ -1036,12 +1304,13 @@ function CalendarView({
 
     if (resizingTask.edge === 'start') {
       // Ensure start date doesn't go past due date
-      if (dateStr <= task.dueDate) {
+      const taskEnd = task.dueDate.split('T')[0];
+      if (dateStr <= taskEnd) {
         onTaskDrop(task.id, { startDate: dateStr, week });
       }
     } else {
       // Ensure due date doesn't go before start date
-      const taskStart = task.startDate || task.dueDate;
+      const taskStart = (task.startDate || task.dueDate).split('T')[0];
       if (dateStr >= taskStart) {
         onTaskDrop(task.id, { dueDate: dateStr, week });
       }
@@ -1139,7 +1408,7 @@ function CalendarView({
                 </div>
                 <div className="space-y-1">
                   {dayTasks.map(task => {
-                    const isMultiDay = task.startDate && task.startDate !== task.dueDate;
+                    const isMultiDay = task.startDate && task.startDate.split('T')[0] !== task.dueDate.split('T')[0];
                     const isFirstDay = isFirstDayInWeek(dateStr, task, week);
                     const isLastDay = isLastDayInWeek(dateStr, task, week);
 
@@ -1194,7 +1463,202 @@ function CalendarView({
   );
 }
 
-function AnalyticsView({ tasks }: { tasks: Task[] }) {
+function ChangelogView({ tasks }: { tasks: Task[] }) {
+  const [filterUser, setFilterUser] = useState<string>('all');
+  const [filterAction, setFilterAction] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Collect all activity logs from all tasks
+  const allActivities = tasks
+    .flatMap(task =>
+      (task.activityLog || []).map(log => ({
+        ...log,
+        taskId: task.id,
+        taskTitle: task.title,
+        taskCompany: task.company
+      }))
+    )
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  // Apply filters
+  const filteredActivities = allActivities.filter(activity => {
+    if (filterUser !== 'all' && activity.user !== filterUser) return false;
+    if (filterAction !== 'all' && !activity.action.toLowerCase().includes(filterAction.toLowerCase())) return false;
+    if (searchQuery && !activity.taskTitle.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+
+  // Group activities by date
+  const groupedByDate = filteredActivities.reduce((acc, activity) => {
+    const date = new Date(activity.timestamp).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(activity);
+    return acc;
+  }, {} as Record<string, typeof filteredActivities>);
+
+  const getActionIcon = (action: string) => {
+    if (action.includes('created')) return '✨';
+    if (action.includes('moved') || action.includes('status')) return '🔄';
+    if (action.includes('assigned')) return '👤';
+    if (action.includes('updated') || action.includes('changed')) return '✏️';
+    if (action.includes('deleted')) return '🗑️';
+    if (action.includes('completed') || action.includes('subtask')) return '✅';
+    if (action.includes('comment')) return '💬';
+    return '📝';
+  };
+
+  const getActionColor = (action: string) => {
+    if (action.includes('created')) return 'bg-green-50 border-green-200 text-green-800';
+    if (action.includes('moved') || action.includes('status')) return 'bg-blue-50 border-blue-200 text-blue-800';
+    if (action.includes('assigned')) return 'bg-purple-50 border-purple-200 text-purple-800';
+    if (action.includes('deleted')) return 'bg-red-50 border-red-200 text-red-800';
+    if (action.includes('completed')) return 'bg-emerald-50 border-emerald-200 text-emerald-800';
+    return 'bg-gray-50 border-gray-200 text-gray-800';
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg p-6">
+        <h2 className="text-3xl font-bold mb-2">Activity Changelog</h2>
+        <p className="text-indigo-100">Track all task movements and changes across the team</p>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-lg p-4 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Filter by User</label>
+            <select
+              value={filterUser}
+              onChange={(e) => setFilterUser(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-gray-900"
+            >
+              <option value="all">All Users</option>
+              {TEAM_MEMBERS.map(member => (
+                <option key={member} value={member}>{member}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Action</label>
+            <select
+              value={filterAction}
+              onChange={(e) => setFilterAction(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-gray-900"
+            >
+              <option value="all">All Actions</option>
+              <option value="created">Created</option>
+              <option value="moved">Moved/Status Changed</option>
+              <option value="assigned">Assignment Changed</option>
+              <option value="updated">Updated</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Search Tasks</label>
+            <input
+              type="text"
+              placeholder="Search task names..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-gray-900"
+            />
+          </div>
+        </div>
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-sm text-gray-600">
+            Showing {filteredActivities.length} of {allActivities.length} activities
+          </p>
+          {(filterUser !== 'all' || filterAction !== 'all' || searchQuery) && (
+            <button
+              onClick={() => {
+                setFilterUser('all');
+                setFilterAction('all');
+                setSearchQuery('');
+              }}
+              className="text-sm text-indigo-600 hover:text-indigo-800 underline"
+            >
+              Clear All Filters
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Activity Timeline */}
+      <div className="space-y-6">
+        {Object.entries(groupedByDate).length === 0 ? (
+          <div className="bg-white rounded-lg p-12 text-center">
+            <p className="text-gray-500 text-lg">No activity logs found</p>
+            <p className="text-gray-400 text-sm mt-2">Activity tracking is now enabled for all future changes</p>
+          </div>
+        ) : (
+          Object.entries(groupedByDate).map(([date, activities]) => (
+            <div key={date} className="space-y-3">
+              <div className="sticky top-0 bg-gray-100 px-4 py-2 rounded-lg">
+                <h3 className="text-sm font-bold text-gray-700">{date}</h3>
+              </div>
+              <div className="space-y-2">
+                {activities.map((activity) => (
+                  <div
+                    key={activity.id}
+                    className={`border-l-4 rounded-lg p-4 ${getActionColor(activity.action)}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">{getActionIcon(activity.action)}</span>
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-semibold text-sm">
+                              <span className="font-bold">{activity.user}</span> {activity.action}
+                            </p>
+                            <p className="text-xs mt-1">
+                              <span className="font-medium">Task:</span>{' '}
+                              <span className="font-semibold">{activity.taskTitle}</span>
+                              {' '}
+                              <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                                activity.taskCompany === 'Muncho' ? 'bg-blue-100 text-blue-800' :
+                                activity.taskCompany === 'Foan' ? 'bg-green-100 text-green-800' :
+                                'bg-purple-100 text-purple-800'
+                              }`}>
+                                {activity.taskCompany}
+                              </span>
+                            </p>
+                            {activity.changes && (
+                              <div className="mt-2 text-xs bg-white bg-opacity-50 rounded p-2">
+                                <span className="font-medium">{activity.changes.field}:</span>{' '}
+                                <span className="line-through text-gray-600">{activity.changes.oldValue}</span>
+                                {' → '}
+                                <span className="font-semibold">{activity.changes.newValue}</span>
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-600 whitespace-nowrap">
+                            {new Date(activity.timestamp).toLocaleTimeString('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsView({ tasks, currentUserName, isAdmin }: { tasks: Task[], currentUserName?: string, isAdmin: boolean }) {
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
 
   // Weighting system: difficulty * importance = task weight
@@ -1250,24 +1714,43 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
   };
 
   // Calculate metrics for each employee
-  const employeeMetrics = TEAM_MEMBERS.map(member => {
+  // If not admin, only show current user's metrics
+  const membersToShow = isAdmin ? TEAM_MEMBERS : (currentUserName ? [currentUserName] : []);
+  const employeeMetrics = membersToShow.map(member => {
     const memberTasks = tasks.filter(t => t.assignees && t.assignees.includes(member));
+
+    // Helper function to check if a task is "done" from this member's perspective
+    const isTaskDoneForMember = (task: Task, memberName: string): boolean => {
+      // If task is marked done, it's done for everyone
+      if (task.status === 'done') return true;
+
+      // Otherwise, check if member has subtasks assigned
+      const memberSubtasks = (task.subtasks || []).filter(st => st.assignee === memberName);
+
+      // If no subtasks assigned to member, follow task status
+      if (memberSubtasks.length === 0) return false;
+
+      // If member has subtasks, check if all are completed
+      return memberSubtasks.every(st => st.completed);
+    };
 
     // Weekly breakdown with scores
     const weeklyData = [1, 2, 3, 4].map(weekNum => {
       const weekTasks = memberTasks.filter(t => t.week === weekNum);
       const weekTotal = weekTasks.length;
-      const weekCompleted = weekTasks.filter(t => t.status === 'done').length;
+      const weekCompleted = weekTasks.filter(t => isTaskDoneForMember(t, member)).length;
       const weekInProgress = weekTasks.filter(t => t.status === 'inProgress').length;
       const weekReview = weekTasks.filter(t => t.status === 'review').length;
       const weekTodo = weekTasks.filter(t => t.status === 'todo').length;
 
       const weekTotalWeight = weekTasks.reduce((sum, task) => sum + getTaskWeight(task), 0);
       const weekCompletedWeight = weekTasks
-        .filter(t => t.status === 'done')
+        .filter(t => isTaskDoneForMember(t, member))
         .reduce((sum, task) => sum + getTaskWeight(task), 0);
 
-      const weekSubtasks = weekTasks.flatMap(t => t.subtasks || []);
+      const weekSubtasks = weekTasks.flatMap(t =>
+        (t.subtasks || []).filter(st => st.assignee === member)
+      );
       const weekSubtaskCompletion = weekSubtasks.length > 0
         ? (weekSubtasks.filter(st => st.completed).length / weekSubtasks.length * 100)
         : 0;
@@ -1303,18 +1786,20 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
     // Overall stats - only count tasks from weeks that have been assigned (not future weeks)
     const tasksWithWeeks = memberTasks.filter(t => t.week !== null);
     const totalTasks = tasksWithWeeks.length;
-    const completedTasks = tasksWithWeeks.filter(t => t.status === 'done').length;
+    const completedTasks = tasksWithWeeks.filter(t => isTaskDoneForMember(t, member)).length;
     const completionRate = totalTasks > 0 ? (completedTasks / totalTasks * 100).toFixed(1) : '0.0';
 
     // Weighted completion (based on difficulty + importance) - only for assigned weeks
     const totalWeight = tasksWithWeeks.reduce((sum, task) => sum + getTaskWeight(task), 0);
     const completedWeight = tasksWithWeeks
-      .filter(t => t.status === 'done')
+      .filter(t => isTaskDoneForMember(t, member))
       .reduce((sum, task) => sum + getTaskWeight(task), 0);
     const weightedCompletionRate = totalWeight > 0 ? (completedWeight / totalWeight * 100).toFixed(1) : '0.0';
 
-    // Subtasks completion - only for assigned weeks
-    const allSubtasks = tasksWithWeeks.flatMap(t => t.subtasks || []);
+    // Subtasks completion - only for assigned weeks and only subtasks assigned to this member
+    const allSubtasks = tasksWithWeeks.flatMap(t =>
+      (t.subtasks || []).filter(st => st.assignee === member)
+    );
     const completedSubtasks = allSubtasks.filter(st => st.completed).length;
     const subtaskCompletionRate = allSubtasks.length > 0 ? (completedSubtasks / allSubtasks.length * 100).toFixed(1) : '0.0';
 
@@ -1364,12 +1849,14 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
     <div className="space-y-6">
       {/* Header */}
       <div className="bg-white rounded-lg p-6 border border-gray-200">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Team Analytics</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          {isAdmin ? 'Team Analytics' : 'My Analytics'}
+        </h2>
         <p className="text-gray-600">January 2026 Performance Overview</p>
       </div>
 
       {/* Overall Summary Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className={`grid ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-4`}>
         <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
           <div className="text-sm text-gray-600 mb-1">Total Tasks</div>
           <div className="text-3xl font-bold text-gray-900">{tasks.length}</div>
@@ -1388,15 +1875,19 @@ function AnalyticsView({ tasks }: { tasks: Task[] }) {
             {tasks.filter(t => t.status === 'inProgress').length} in progress, {tasks.filter(t => t.status === 'review').length} in review
           </div>
         </div>
-        <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-          <div className="text-sm text-gray-600 mb-1">Team Members</div>
-          <div className="text-3xl font-bold text-gray-900">{TEAM_MEMBERS.length}</div>
-        </div>
+        {isAdmin && (
+          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+            <div className="text-sm text-gray-600 mb-1">Team Members</div>
+            <div className="text-3xl font-bold text-gray-900">{TEAM_MEMBERS.length}</div>
+          </div>
+        )}
       </div>
 
       {/* Employee Performance Table */}
       <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Employee Performance Rankings</h3>
+        <h3 className="text-xl font-bold text-gray-900 mb-4">
+          {isAdmin ? 'Employee Performance Rankings' : 'My Performance'}
+        </h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -1668,8 +2159,8 @@ function WeekView({
 
   // Helper to check if a date is between start and due date (inclusive)
   const isDateInTaskRange = (dateStr: string, task: Task) => {
-    const taskStart = task.startDate || task.dueDate;
-    const taskEnd = task.dueDate;
+    const taskStart = (task.startDate || task.dueDate).split('T')[0];
+    const taskEnd = task.dueDate.split('T')[0];
     return dateStr >= taskStart && dateStr <= taskEnd;
   };
 
@@ -1696,12 +2187,13 @@ function WeekView({
 
     if (resizingTask.edge === 'start') {
       // Ensure start date doesn't go past due date
-      if (dateStr <= task.dueDate) {
+      const taskEnd = task.dueDate.split('T')[0];
+      if (dateStr <= taskEnd) {
         onTaskDrop(task.id, { startDate: dateStr, week: weekNumber });
       }
     } else {
       // Ensure due date doesn't go before start date
-      const taskStart = task.startDate || task.dueDate;
+      const taskStart = (task.startDate || task.dueDate).split('T')[0];
       if (dateStr >= taskStart) {
         onTaskDrop(task.id, { dueDate: dateStr, week: weekNumber });
       }
@@ -1783,9 +2275,9 @@ function WeekView({
               </div>
               <div className="space-y-3 flex-1 overflow-y-auto">
                 {dayTasks.map(task => {
-                  const isMultiDay = task.startDate && task.startDate !== task.dueDate;
-                  const isStartDay = dateStr === (task.startDate || task.dueDate);
-                  const isEndDay = dateStr === task.dueDate;
+                  const isMultiDay = task.startDate && task.startDate.split('T')[0] !== task.dueDate.split('T')[0];
+                  const isStartDay = dateStr === (task.startDate || task.dueDate).split('T')[0];
+                  const isEndDay = dateStr === task.dueDate.split('T')[0];
 
                   return (
                     <div
@@ -1914,6 +2406,7 @@ function TaskModal({
   const [newSubtask, setNewSubtask] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [activeTab, setActiveTab] = useState<'details' | 'changelog'>('details');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
@@ -2183,6 +2676,36 @@ function TaskModal({
             <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">×</button>
           </div>
 
+          {/* Tabs */}
+          <div className="flex gap-2 mb-6 border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('details')}
+              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+                activeTab === 'details'
+                  ? 'border-gray-800 text-gray-900'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Details
+            </button>
+            <button
+              onClick={() => setActiveTab('changelog')}
+              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+                activeTab === 'changelog'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Changelog
+              {editedTask.activityLog && editedTask.activityLog.length > 0 && (
+                <span className="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-600 rounded-full text-xs">
+                  {editedTask.activityLog.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {activeTab === 'details' ? (
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
@@ -2639,6 +3162,82 @@ function TaskModal({
               )}
             </div>
           </div>
+          ) : (
+            /* Changelog Tab */
+            <div className="space-y-4">
+              {!editedTask.activityLog || editedTask.activityLog.length === 0 ? (
+                <div className="bg-gray-50 rounded-lg p-12 text-center">
+                  <p className="text-gray-500 text-lg">No activity yet</p>
+                  <p className="text-gray-400 text-sm mt-2">Changes to this task will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {[...editedTask.activityLog].reverse().map((log) => {
+                    const getActionIcon = (action: string) => {
+                      if (action.includes('created')) return '✨';
+                      if (action.includes('moved') || action.includes('status')) return '🔄';
+                      if (action.includes('assigned')) return '👤';
+                      if (action.includes('updated') || action.includes('changed')) return '✏️';
+                      if (action.includes('completed') || action.includes('subtask')) return '✅';
+                      return '📝';
+                    };
+
+                    const getActionColor = (action: string) => {
+                      if (action.includes('created')) return 'bg-green-50 border-green-200 text-green-800';
+                      if (action.includes('moved') || action.includes('status')) return 'bg-blue-50 border-blue-200 text-blue-800';
+                      if (action.includes('assigned')) return 'bg-purple-50 border-purple-200 text-purple-800';
+                      if (action.includes('completed')) return 'bg-emerald-50 border-emerald-200 text-emerald-800';
+                      return 'bg-gray-50 border-gray-200 text-gray-800';
+                    };
+
+                    return (
+                      <div
+                        key={log.id}
+                        className={`border-l-4 rounded-lg p-4 ${getActionColor(log.action)}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="text-2xl">{getActionIcon(log.action)}</span>
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <p className="font-semibold text-sm">
+                                  <span className="font-bold">{log.user}</span> {log.action}
+                                </p>
+                                {log.changes && (
+                                  <div className="mt-2 text-xs bg-white bg-opacity-50 rounded p-2">
+                                    <span className="font-medium">{log.changes.field}:</span>{' '}
+                                    <span className="line-through text-gray-600">{log.changes.oldValue}</span>
+                                    {' → '}
+                                    <span className="font-semibold">{log.changes.newValue}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-right ml-4">
+                                <span className="text-xs text-gray-600 block">
+                                  {new Date(log.timestamp).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                  })}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {new Date(log.timestamp).toLocaleTimeString('en-US', {
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                    hour12: true
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

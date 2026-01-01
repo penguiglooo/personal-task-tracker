@@ -974,14 +974,14 @@ export default function DashboardPage() {
         <div className="mb-6">
           {view === 'calendar' ? (
             <>
-              <div className="mb-4 bg-white rounded-lg p-4 shadow-sm flex items-center justify-between">
+              <div className="mb-4 bg-white dark:bg-[#252525] rounded-lg p-4 shadow-sm flex items-center justify-between border dark:border-[#373737]">
                 <div className="flex gap-2">
                   <button
                     onClick={() => setCalendarViewMode('month')}
                     className={`px-4 py-2 rounded-lg font-medium ${
                       calendarViewMode === 'month'
-                        ? 'bg-gray-800 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? 'bg-gray-800 dark:bg-[#373737] text-white'
+                        : 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#333333]'
                     }`}
                   >
                     Month View
@@ -990,8 +990,8 @@ export default function DashboardPage() {
                     onClick={() => setCalendarViewMode('week')}
                     className={`px-4 py-2 rounded-lg font-medium ${
                       calendarViewMode === 'week'
-                        ? 'bg-gray-800 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? 'bg-gray-800 dark:bg-[#373737] text-white'
+                        : 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#333333]'
                     }`}
                   >
                     Week View
@@ -999,11 +999,11 @@ export default function DashboardPage() {
                 </div>
                 {calendarViewMode === 'week' && (
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">Select Week:</label>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Select Week:</label>
                     <select
                       value={selectedWeekForWeekView}
                       onChange={(e) => setSelectedWeekForWeekView(parseInt(e.target.value))}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-800 text-gray-900"
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-gray-800 text-gray-900 dark:text-gray-200 dark:bg-[#2d2d2d]"
                     >
                       <option value="1">Week 1 (Jan 1-7)</option>
                       <option value="2">Week 2 (Jan 8-15)</option>
@@ -1567,12 +1567,12 @@ function ChangelogView({ tasks }: { tasks: Task[] }) {
   };
 
   const getActionColor = (action: string) => {
-    if (action.includes('created')) return 'bg-green-50 border-green-200 text-green-800';
-    if (action.includes('moved') || action.includes('status')) return 'bg-blue-50 border-blue-200 text-blue-800';
-    if (action.includes('assigned')) return 'bg-purple-50 border-purple-200 text-purple-800';
-    if (action.includes('deleted')) return 'bg-red-50 border-red-200 text-red-800';
-    if (action.includes('completed')) return 'bg-emerald-50 border-emerald-200 text-emerald-800';
-    return 'bg-gray-50 border-gray-200 text-gray-800';
+    if (action.includes('created')) return 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300';
+    if (action.includes('moved') || action.includes('status')) return 'bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300';
+    if (action.includes('assigned')) return 'bg-purple-50 dark:bg-purple-900 border-purple-200 dark:border-purple-800 text-purple-800 dark:text-purple-300';
+    if (action.includes('deleted')) return 'bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300';
+    if (action.includes('completed')) return 'bg-emerald-50 dark:bg-emerald-900 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300';
+    return 'bg-gray-50 dark:bg-[#2d2d2d] border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-300';
   };
 
   return (
@@ -1626,7 +1626,7 @@ function ChangelogView({ tasks }: { tasks: Task[] }) {
           </div>
         </div>
         <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Showing {filteredActivities.length} of {allActivities.length} activities
           </p>
           {(filterUser !== 'all' || filterAction !== 'all' || searchQuery) && (
@@ -1636,7 +1636,7 @@ function ChangelogView({ tasks }: { tasks: Task[] }) {
                 setFilterAction('all');
                 setSearchQuery('');
               }}
-              className="text-sm text-indigo-600 hover:text-indigo-800 underline"
+              className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 underline"
             >
               Clear All Filters
             </button>
@@ -1647,15 +1647,15 @@ function ChangelogView({ tasks }: { tasks: Task[] }) {
       {/* Activity Timeline */}
       <div className="space-y-6">
         {Object.entries(groupedByDate).length === 0 ? (
-          <div className="bg-white rounded-lg p-12 text-center">
-            <p className="text-gray-500 text-lg">No activity logs found</p>
-            <p className="text-gray-400 text-sm mt-2">Activity tracking is now enabled for all future changes</p>
+          <div className="bg-white dark:bg-[#252525] rounded-lg p-12 text-center border dark:border-[#373737]">
+            <p className="text-gray-500 dark:text-gray-400 text-lg">No activity logs found</p>
+            <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Activity tracking is now enabled for all future changes</p>
           </div>
         ) : (
           Object.entries(groupedByDate).map(([date, activities]) => (
             <div key={date} className="space-y-3">
-              <div className="sticky top-0 bg-gray-100 px-4 py-2 rounded-lg">
-                <h3 className="text-sm font-bold text-gray-700">{date}</h3>
+              <div className="sticky top-0 bg-gray-100 dark:bg-[#2d2d2d] px-4 py-2 rounded-lg border dark:border-[#404040]">
+                <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300">{date}</h3>
               </div>
               <div className="space-y-2">
                 {activities.map((activity) => (
@@ -1676,23 +1676,23 @@ function ChangelogView({ tasks }: { tasks: Task[] }) {
                               <span className="font-semibold">{activity.taskTitle}</span>
                               {' '}
                               <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
-                                activity.taskCompany === 'Muncho' ? 'bg-blue-100 text-blue-800' :
-                                activity.taskCompany === 'Foan' ? 'bg-green-100 text-green-800' :
-                                'bg-purple-100 text-purple-800'
+                                activity.taskCompany === 'Muncho' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300' :
+                                activity.taskCompany === 'Foan' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300' :
+                                'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-300'
                               }`}>
                                 {activity.taskCompany}
                               </span>
                             </p>
                             {activity.changes && (
-                              <div className="mt-2 text-xs bg-white bg-opacity-50 rounded p-2">
+                              <div className="mt-2 text-xs bg-white dark:bg-black bg-opacity-50 dark:bg-opacity-30 rounded p-2">
                                 <span className="font-medium">{activity.changes.field}:</span>{' '}
-                                <span className="line-through text-gray-600">{activity.changes.oldValue}</span>
+                                <span className="line-through text-gray-600 dark:text-gray-400">{activity.changes.oldValue}</span>
                                 {' → '}
                                 <span className="font-semibold">{activity.changes.newValue}</span>
                               </div>
                             )}
                           </div>
-                          <span className="text-xs text-gray-600 whitespace-nowrap">
+                          <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
                             {new Date(activity.timestamp).toLocaleTimeString('en-US', {
                               hour: 'numeric',
                               minute: '2-digit',

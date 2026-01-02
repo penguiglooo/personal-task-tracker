@@ -217,15 +217,76 @@ export default function DashboardPage() {
 
         // Track subtask changes
         if (updates.subtasks && JSON.stringify(updates.subtasks) !== JSON.stringify(currentTask.subtasks)) {
-          const oldCompleted = (currentTask.subtasks || []).filter(st => st.completed).length;
-          const newCompleted = (updates.subtasks || []).filter(st => st.completed).length;
-          if (oldCompleted !== newCompleted) {
-            newActivityLogs.push({
-              id: `${Date.now()}-subtasks`,
-              timestamp: new Date().toISOString(),
-              user: userName,
-              action: `updated subtask completion (${newCompleted}/${updates.subtasks.length} completed)`,
+          const oldSubtasks = currentTask.subtasks || [];
+          const newSubtasks = updates.subtasks || [];
+
+          // Check if subtasks were added
+          if (newSubtasks.length > oldSubtasks.length) {
+            const addedCount = newSubtasks.length - oldSubtasks.length;
+            const addedSubtasks = newSubtasks.slice(-addedCount);
+            addedSubtasks.forEach(subtask => {
+              newActivityLogs.push({
+                id: `${Date.now()}-subtask-add-${subtask.id}`,
+                timestamp: new Date().toISOString(),
+                user: userName,
+                action: `added subtask: "${subtask.text}"`,
+              });
             });
+          }
+
+          // Check if subtasks were deleted
+          if (newSubtasks.length < oldSubtasks.length) {
+            const deletedCount = oldSubtasks.length - newSubtasks.length;
+            const oldIds = oldSubtasks.map(st => st.id);
+            const newIds = newSubtasks.map(st => st.id);
+            const deletedIds = oldIds.filter(id => !newIds.includes(id));
+            deletedIds.forEach(id => {
+              const deletedSubtask = oldSubtasks.find(st => st.id === id);
+              if (deletedSubtask) {
+                newActivityLogs.push({
+                  id: `${Date.now()}-subtask-delete-${id}`,
+                  timestamp: new Date().toISOString(),
+                  user: userName,
+                  action: `deleted subtask: "${deletedSubtask.text}"`,
+                });
+              }
+            });
+          }
+
+          // Check for completion status changes
+          const oldCompleted = oldSubtasks.filter(st => st.completed).length;
+          const newCompleted = newSubtasks.filter(st => st.completed).length;
+          if (oldCompleted !== newCompleted && newSubtasks.length === oldSubtasks.length) {
+            // Find which subtask was toggled
+            for (const newSubtask of newSubtasks) {
+              const oldSubtask = oldSubtasks.find(st => st.id === newSubtask.id);
+              if (oldSubtask && oldSubtask.completed !== newSubtask.completed) {
+                newActivityLogs.push({
+                  id: `${Date.now()}-subtask-toggle-${newSubtask.id}`,
+                  timestamp: new Date().toISOString(),
+                  user: userName,
+                  action: newSubtask.completed
+                    ? `completed subtask: "${newSubtask.text}"`
+                    : `marked subtask as incomplete: "${newSubtask.text}"`,
+                });
+              }
+            }
+          }
+
+          // Check for assignee changes
+          for (const newSubtask of newSubtasks) {
+            const oldSubtask = oldSubtasks.find(st => st.id === newSubtask.id);
+            if (oldSubtask && oldSubtask.assignee !== newSubtask.assignee) {
+              const assigneeAction = newSubtask.assignee
+                ? `assigned "${newSubtask.text}" to ${newSubtask.assignee}`
+                : `unassigned "${newSubtask.text}"`;
+              newActivityLogs.push({
+                id: `${Date.now()}-subtask-assign-${newSubtask.id}`,
+                timestamp: new Date().toISOString(),
+                user: userName,
+                action: assigneeAction,
+              });
+            }
           }
         }
 

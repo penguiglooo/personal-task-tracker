@@ -318,8 +318,28 @@ export default function DashboardPage() {
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupMembers, setNewGroupMembers] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const isAdmin = (session?.user as any)?.role === 'admin';
+
+  // Fuzzy search function
+  const fuzzyMatch = (text: string, query: string): boolean => {
+    if (!query) return true;
+    const searchText = text.toLowerCase();
+    const searchQuery = query.toLowerCase().trim();
+
+    // Exact match
+    if (searchText.includes(searchQuery)) return true;
+
+    // Fuzzy match - all characters must appear in order
+    let queryIndex = 0;
+    for (let i = 0; i < searchText.length && queryIndex < searchQuery.length; i++) {
+      if (searchText[i] === searchQuery[queryIndex]) {
+        queryIndex++;
+      }
+    }
+    return queryIndex === searchQuery.length;
+  };
 
   // Load dark mode preference from localStorage
   useEffect(() => {
@@ -372,13 +392,12 @@ export default function DashboardPage() {
   }, [status, isAdmin]);
 
   useEffect(() => {
-    // Apply user filter for admins
-    if (userFilter.length === 0) {
-      // No filter selected, show all tasks
-      setFilteredTasks(tasks);
-    } else {
-      // Filter tasks that have at least one assignee matching the selected filters
-      setFilteredTasks(tasks.filter(task => {
+    // Apply user filter and search
+    let filtered = tasks;
+
+    // Apply user filter
+    if (userFilter.length > 0) {
+      filtered = filtered.filter(task => {
         // Handle 'null' filter for unassigned tasks
         if (userFilter.includes('null')) {
           if (!task.assignees || task.assignees.length === 0) return true;
@@ -388,9 +407,29 @@ export default function DashboardPage() {
           return true;
         }
         return false;
-      }));
+      });
     }
-  }, [userFilter, tasks]);
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(task => {
+        // Search in title
+        if (fuzzyMatch(task.title || '', searchQuery)) return true;
+
+        // Search in description
+        if (task.description && fuzzyMatch(task.description, searchQuery)) return true;
+
+        // Search in subtasks
+        if (task.subtasks && task.subtasks.some(subtask =>
+          fuzzyMatch(subtask.text, searchQuery)
+        )) return true;
+
+        return false;
+      });
+    }
+
+    setFilteredTasks(filtered);
+  }, [userFilter, tasks, searchQuery]);
 
   const fetchTasks = async () => {
     try {
@@ -1198,6 +1237,32 @@ export default function DashboardPage() {
             </button>
           </div>
         </header>
+
+        {/* Search Bar */}
+        <div className="mb-4">
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="🔍 Search tasks, descriptions, subtasks..."
+              className="w-full px-4 py-3 pl-10 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-200 bg-white dark:bg-[#252525] placeholder-gray-500 dark:placeholder-gray-400"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          {searchQuery && (
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              Found {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} matching "{searchQuery}"
+            </p>
+          )}
+        </div>
 
         {isAdmin && (
           <div className="mb-6 bg-white dark:bg-[#252525] rounded-lg shadow-sm">

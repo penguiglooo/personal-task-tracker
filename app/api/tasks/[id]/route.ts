@@ -39,7 +39,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     const updateData: any = {};
-    if (updates.title) updateData.title = updates.title;
+    if (updates.title !== undefined) updateData.title = updates.title;
+    if (updates.description !== undefined) updateData.description = updates.description;
     if (updates.company) updateData.company = updates.company;
     if (updates.status) updateData.status = updates.status;
     if (updates.assignees !== undefined) updateData.assignees = updates.assignees;
@@ -52,6 +53,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (updates.isBacklog !== undefined) updateData.is_backlog = updates.isBacklog;
     if (updates.comments) updateData.comments = updates.comments;
     if (updates.subtasks !== undefined) updateData.subtasks = updates.subtasks;
+    if (updates.difficulty !== undefined) updateData.difficulty = updates.difficulty;
+    if (updates.importance !== undefined) updateData.importance = updates.importance;
+    if (updates.attachments !== undefined) updateData.attachments = updates.attachments;
     if (updates.activityLog !== undefined) updateData.activity_log = updates.activityLog;
 
     const { data: updated, error } = await supabaseAdmin.from('tasks').update(updateData).eq('task_id', id).select().single();
@@ -61,6 +65,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       _id: updated.id,
       id: updated.task_id,
       title: updated.title,
+      description: updated.description,
       company: updated.company,
       week: updated.week,
       status: updated.status,
@@ -69,6 +74,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       dueDate: updated.due_date,
       comments: updated.comments || [],
       subtasks: updated.subtasks || [],
+      difficulty: updated.difficulty,
+      importance: updated.importance,
+      attachments: updated.attachments || [],
       activityLog: updated.activity_log || [],
       isBacklog: updated.is_backlog || updated.week === null,
       createdAt: updated.created_at || updated.due_date

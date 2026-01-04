@@ -71,12 +71,227 @@ const STATUS_LABELS = {
   done: 'Done'
 };
 
+function HomeView({ tasks, currentUserName, onTaskClick, isAdmin }: {
+  tasks: Task[];
+  currentUserName: string;
+  onTaskClick: (task: Task) => void;
+  isAdmin: boolean;
+}) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split('T')[0];
+
+  const next7Days = new Date(today);
+  next7Days.setDate(next7Days.getDate() + 7);
+  const next7DaysStr = next7Days.toISOString().split('T')[0];
+
+  // Filter tasks for current user (or all tasks if admin viewing all)
+  const userTasks = tasks.filter(task =>
+    isAdmin || task.assignees.includes(currentUserName)
+  );
+
+  // Calculate statistics
+  const stats = {
+    todo: userTasks.filter(t => t.status === 'todo').length,
+    inProgress: userTasks.filter(t => t.status === 'inProgress').length,
+    review: userTasks.filter(t => t.status === 'review').length,
+    done: userTasks.filter(t => t.status === 'done').length,
+  };
+
+  // Today's tasks (due today)
+  const todaysTasks = userTasks.filter(task => {
+    const taskDate = task.dueDate?.split('T')[0];
+    return taskDate === todayStr;
+  });
+
+  // Upcoming deadlines (next 7 days, excluding today)
+  const upcomingTasks = userTasks.filter(task => {
+    const taskDate = task.dueDate?.split('T')[0];
+    return taskDate && taskDate > todayStr && taskDate <= next7DaysStr;
+  }).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+
+  // Overdue tasks
+  const overdueTasks = userTasks.filter(task => {
+    const taskDate = task.dueDate?.split('T')[0];
+    return task.status !== 'done' && taskDate && taskDate < todayStr;
+  });
+
+  // Recent activity (tasks with recent activity logs)
+  const recentActivity = userTasks
+    .filter(task => task.activityLog && task.activityLog.length > 0)
+    .sort((a, b) => {
+      const aTime = a.activityLog && a.activityLog.length > 0
+        ? new Date(a.activityLog[a.activityLog.length - 1].timestamp).getTime()
+        : 0;
+      const bTime = b.activityLog && b.activityLog.length > 0
+        ? new Date(b.activityLog[b.activityLog.length - 1].timestamp).getTime()
+        : 0;
+      return bTime - aTime;
+    })
+    .slice(0, 5);
+
+  const TaskCard = ({ task }: { task: Task }) => (
+    <div
+      onClick={() => onTaskClick(task)}
+      className="bg-white dark:bg-[#2d2d2d] border border-gray-200 dark:border-[#404040] rounded-lg p-4 hover:shadow-md cursor-pointer transition-all hover:border-gray-300 dark:hover:border-[#4a4a4a]"
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm leading-tight flex-1">
+          {task.title || '(No title)'}
+        </h3>
+        {task.importance && (
+          <span className={`text-xs px-2 py-1 rounded font-medium flex-shrink-0 ${
+            task.importance === 'Low' ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' :
+            task.importance === 'Medium' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' :
+            task.importance === 'High' ? 'bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300' :
+            'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300'
+          }`}>
+            {task.importance === 'Critical' ? '⚠️' : task.importance}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2 text-xs">
+        <span className={`px-2 py-1 rounded ${
+          task.status === 'done' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300' :
+          task.status === 'review' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300' :
+          task.status === 'inProgress' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300' :
+          'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
+        }`}>
+          {STATUS_LABELS[task.status]}
+        </span>
+        {task.company && (
+          <span className="bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-300 px-2 py-1 rounded">
+            {task.company}
+          </span>
+        )}
+        <span className="text-gray-600 dark:text-gray-400">
+          📅 {new Date(task.dueDate).toLocaleDateString()}
+        </span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          Welcome back, {currentUserName}!
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          Here's your task overview for today
+        </p>
+      </div>
+
+      {/* Statistics Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-[#2d2d2d] border border-gray-200 dark:border-[#404040] rounded-lg p-6">
+          <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{stats.todo}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">To Do</div>
+        </div>
+        <div className="bg-white dark:bg-[#2d2d2d] border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">{stats.inProgress}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">In Progress</div>
+        </div>
+        <div className="bg-white dark:bg-[#2d2d2d] border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
+          <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mb-1">{stats.review}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">In Review</div>
+        </div>
+        <div className="bg-white dark:bg-[#2d2d2d] border border-green-200 dark:border-green-800 rounded-lg p-6">
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">{stats.done}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Completed</div>
+        </div>
+      </div>
+
+      {/* Overdue Tasks Alert */}
+      {overdueTasks.length > 0 && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <h2 className="text-lg font-bold text-red-800 dark:text-red-300 mb-2">
+            ⚠️ {overdueTasks.length} Overdue Task{overdueTasks.length > 1 ? 's' : ''}
+          </h2>
+          <div className="space-y-2">
+            {overdueTasks.slice(0, 3).map(task => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Today's Tasks */}
+      <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#373737] rounded-lg p-6">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+          📅 Today's Tasks ({todaysTasks.length})
+        </h2>
+        {todaysTasks.length > 0 ? (
+          <div className="space-y-3">
+            {todaysTasks.map(task => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+            No tasks due today. Great job staying on top of things!
+          </p>
+        )}
+      </div>
+
+      {/* Upcoming Deadlines */}
+      <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#373737] rounded-lg p-6">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+          🔔 Upcoming Deadlines (Next 7 Days)
+        </h2>
+        {upcomingTasks.length > 0 ? (
+          <div className="space-y-3">
+            {upcomingTasks.map(task => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+            No upcoming deadlines in the next 7 days
+          </p>
+        )}
+      </div>
+
+      {/* Recent Activity */}
+      {recentActivity.length > 0 && (
+        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#373737] rounded-lg p-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+            📊 Recent Activity
+          </h2>
+          <div className="space-y-3">
+            {recentActivity.map(task => {
+              const lastActivity = task.activityLog && task.activityLog.length > 0
+                ? task.activityLog[task.activityLog.length - 1]
+                : null;
+              return (
+                <div key={task.id} className="bg-gray-50 dark:bg-[#2d2d2d] border border-gray-200 dark:border-[#404040] rounded-lg p-3">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <span className="font-medium text-gray-900 dark:text-gray-100 text-sm">{task.title}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                      {lastActivity && new Date(lastActivity.timestamp).toLocaleString()}
+                    </span>
+                  </div>
+                  {lastActivity && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="font-medium">{lastActivity.user}</span> {lastActivity.action}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
-  const [view, setView] = useState('week1');
+  const [view, setView] = useState('home');
   const [calendarViewMode, setCalendarViewMode] = useState<'month' | 'week'>('month');
   const [selectedWeekForWeekView, setSelectedWeekForWeekView] = useState(1);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -976,6 +1191,16 @@ export default function DashboardPage() {
 
         <div className="mb-6 flex gap-2 flex-wrap">
           <button
+            onClick={() => setView('home')}
+            className={`px-4 py-2 rounded-lg font-medium ${
+              view === 'home'
+                ? 'bg-blue-600 dark:bg-blue-700 text-white'
+                : 'bg-white dark:bg-[#252525] text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2d2d2d]'
+            }`}
+          >
+            🏠 Home
+          </button>
+          <button
             onClick={() => setView('calendar')}
             className={`px-4 py-2 rounded-lg font-medium ${
               view === 'calendar'
@@ -1093,6 +1318,13 @@ export default function DashboardPage() {
                 />
               )}
             </>
+          ) : view === 'home' ? (
+            <HomeView
+              tasks={filteredTasks}
+              currentUserName={(session?.user as any)?.name}
+              onTaskClick={setSelectedTask}
+              isAdmin={isAdmin}
+            />
           ) : view === 'analytics' ? (
             <AnalyticsView tasks={tasks} currentUserName={(session?.user as any)?.name} isAdmin={isAdmin} />
           ) : view === 'changelog' ? (
@@ -2937,10 +3169,10 @@ function TaskModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Members</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Members</label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {editedTask.assignees?.map(member => (
-                  <div key={member} className="flex items-center gap-1 bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">
+                  <div key={member} className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-3 py-1 rounded-full text-sm">
                     <span className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-semibold">
                       {member.charAt(0)}
                     </span>
@@ -2951,7 +3183,7 @@ function TaskModal({
                           const newAssignees = editedTask.assignees.filter(a => a !== member);
                           setEditedTask({...editedTask, assignees: newAssignees});
                         }}
-                        className="ml-1 text-gray-500 hover:text-gray-700 font-bold"
+                        className="ml-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-bold"
                       >
                         ×
                       </button>
@@ -2962,14 +3194,14 @@ function TaskModal({
                   <div className="relative member-dropdown-container">
                     <button
                       onClick={() => setShowMemberDropdown(!showMemberDropdown)}
-                      className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600 text-xl font-bold"
+                      className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center justify-center text-gray-600 dark:text-gray-300 text-xl font-bold"
                     >
                       +
                     </button>
                     {showMemberDropdown && (
-                      <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 min-w-[200px]">
+                      <div className="absolute top-full left-0 mt-1 bg-white dark:bg-[#2d2d2d] border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-10 min-w-[200px]">
                         <div className="p-2">
-                          <div className="text-xs font-semibold text-gray-600 px-2 py-1">TEAM MEMBERS</div>
+                          <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 px-2 py-1">TEAM MEMBERS</div>
                           {TEAM_MEMBERS.filter(member => !editedTask.assignees?.includes(member)).map(member => (
                             <button
                               key={member}
@@ -2978,16 +3210,16 @@ function TaskModal({
                                 setEditedTask({...editedTask, assignees: newAssignees});
                                 setShowMemberDropdown(false);
                               }}
-                              className="w-full flex items-center gap-2 px-2 py-2 hover:bg-gray-100 rounded text-sm text-left"
+                              className="w-full flex items-center gap-2 px-2 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-sm text-left"
                             >
                               <span className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-semibold">
                                 {member.charAt(0)}
                               </span>
-                              <span className="text-gray-800">{member}</span>
+                              <span className="text-gray-800 dark:text-gray-200">{member}</span>
                             </button>
                           ))}
                           {TEAM_MEMBERS.filter(member => !editedTask.assignees?.includes(member)).length === 0 && (
-                            <div className="px-2 py-2 text-sm text-gray-500">All members assigned</div>
+                            <div className="px-2 py-2 text-sm text-gray-500 dark:text-gray-400">All members assigned</div>
                           )}
                         </div>
                       </div>

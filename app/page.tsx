@@ -202,86 +202,95 @@ function HomeView({ tasks, currentUserName, onTaskClick, isAdmin }: {
         </div>
       </div>
 
-      {/* Overdue Tasks Alert */}
-      {overdueTasks.length > 0 && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <h2 className="text-lg font-bold text-red-800 dark:text-red-300 mb-2">
-            ⚠️ {overdueTasks.length} Overdue Task{overdueTasks.length > 1 ? 's' : ''}
-          </h2>
-          <div className="space-y-2">
-            {overdueTasks.slice(0, 3).map(task => (
-              <TaskCard key={task.id} task={task} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Today's Tasks */}
-      <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#373737] rounded-lg p-6">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-          📅 Today's Tasks ({todaysTasks.length})
-        </h2>
-        {todaysTasks.length > 0 ? (
-          <div className="space-y-3">
-            {todaysTasks.map(task => (
-              <TaskCard key={task.id} task={task} />
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-500 dark:text-gray-400 text-center py-8">
-            No tasks due today. Great job staying on top of things!
-          </p>
-        )}
-      </div>
-
-      {/* Upcoming Deadlines */}
-      <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#373737] rounded-lg p-6">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-          🔔 Upcoming Deadlines (Next 7 Days)
-        </h2>
-        {upcomingTasks.length > 0 ? (
-          <div className="space-y-3">
-            {upcomingTasks.map(task => (
-              <TaskCard key={task.id} task={task} />
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-500 dark:text-gray-400 text-center py-8">
-            No upcoming deadlines in the next 7 days
-          </p>
-        )}
-      </div>
-
-      {/* Recent Activity */}
-      {recentActivity.length > 0 && (
+      {/* Two-column grid: Today's Tasks and Overdue Tasks */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Today's Tasks - Left */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#373737] rounded-lg p-6">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-            📊 Recent Activity
+            📅 Today's Tasks ({todaysTasks.length})
           </h2>
-          <div className="space-y-3">
-            {recentActivity.map(task => {
-              const lastActivity = task.activityLog && task.activityLog.length > 0
-                ? task.activityLog[task.activityLog.length - 1]
-                : null;
-              return (
-                <div key={task.id} className="bg-gray-50 dark:bg-[#2d2d2d] border border-gray-200 dark:border-[#404040] rounded-lg p-3">
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <span className="font-medium text-gray-900 dark:text-gray-100 text-sm">{task.title}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
-                      {lastActivity && new Date(lastActivity.timestamp).toLocaleString()}
-                    </span>
-                  </div>
-                  {lastActivity && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      <span className="font-medium">{lastActivity.user}</span> {lastActivity.action}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {todaysTasks.length > 0 ? (
+            <div className="space-y-3">
+              {todaysTasks.map(task => (
+                <TaskCard key={task.id} task={task} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+              No tasks due today. Great job staying on top of things!
+            </p>
+          )}
         </div>
-      )}
+
+        {/* Overdue Tasks - Right */}
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+          <h2 className="text-xl font-bold text-red-800 dark:text-red-300 mb-4">
+            ⚠️ Overdue Tasks ({overdueTasks.length})
+          </h2>
+          {overdueTasks.length > 0 ? (
+            <div className="space-y-3">
+              {overdueTasks.map(task => (
+                <TaskCard key={task.id} task={task} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+              No overdue tasks. You're all caught up!
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Upcoming Deadlines - Full Width */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#373737] rounded-lg p-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+            🔔 Upcoming Deadlines (Next 7 Days)
+          </h2>
+          {upcomingTasks.length > 0 ? (
+            <div className="space-y-3">
+              {upcomingTasks.map(task => (
+                <TaskCard key={task.id} task={task} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+              No upcoming deadlines in the next 7 days
+            </p>
+          )}
+        </div>
+
+        {/* Recent Activity - Right column */}
+        {recentActivity.length > 0 && (
+          <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#373737] rounded-lg p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              📊 Recent Activity
+            </h2>
+            <div className="space-y-3">
+              {recentActivity.map(task => {
+                const lastActivity = task.activityLog && task.activityLog.length > 0
+                  ? task.activityLog[task.activityLog.length - 1]
+                  : null;
+                return (
+                  <div key={task.id} className="bg-gray-50 dark:bg-[#2d2d2d] border border-gray-200 dark:border-[#404040] rounded-lg p-3">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <span className="font-medium text-gray-900 dark:text-gray-100 text-sm">{task.title}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                        {lastActivity && new Date(lastActivity.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                    {lastActivity && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <span className="font-medium">{lastActivity.user}</span> {lastActivity.action}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -304,6 +313,11 @@ export default function DashboardPage() {
   const [resetNewPassword, setResetNewPassword] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [filterGroups, setFilterGroups] = useState<{ name: string; members: string[] }[]>([]);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupMembers, setNewGroupMembers] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
 
   const isAdmin = (session?.user as any)?.role === 'admin';
 
@@ -312,6 +326,15 @@ export default function DashboardPage() {
     const savedDarkMode = localStorage.getItem('darkMode');
     if (savedDarkMode === 'true') {
       setDarkMode(true);
+    }
+    // Load filter groups from localStorage
+    const savedGroups = localStorage.getItem('filterGroups');
+    if (savedGroups) {
+      try {
+        setFilterGroups(JSON.parse(savedGroups));
+      } catch (e) {
+        console.error('Failed to load filter groups', e);
+      }
     }
   }, []);
 
@@ -325,6 +348,11 @@ export default function DashboardPage() {
     }
   }, [darkMode]);
 
+  // Save filter groups to localStorage
+  useEffect(() => {
+    localStorage.setItem('filterGroups', JSON.stringify(filterGroups));
+  }, [filterGroups]);
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
@@ -336,8 +364,12 @@ export default function DashboardPage() {
   useEffect(() => {
     if (status === 'authenticated') {
       fetchTasks();
+      // Set default filter to current user for admins (Dhruv, Akaash, Swapnil)
+      if (isAdmin && session?.user?.name) {
+        setUserFilter([session.user.name]);
+      }
     }
-  }, [status]);
+  }, [status, isAdmin]);
 
   useEffect(() => {
     // Apply user filter for admins
@@ -696,6 +728,41 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Failed to add comment:', error);
       alert('Failed to add comment');
+    }
+  };
+
+  const handleCreateGroup = () => {
+    if (newGroupName.trim() && newGroupMembers.length > 0) {
+      setFilterGroups([...filterGroups, { name: newGroupName.trim(), members: newGroupMembers }]);
+      setNewGroupName('');
+      setNewGroupMembers([]);
+      setShowCreateGroup(false);
+    }
+  };
+
+  const handleDeleteGroup = (groupName: string) => {
+    if (confirm(`Delete filter group "${groupName}"?`)) {
+      setFilterGroups(filterGroups.filter(g => g.name !== groupName));
+    }
+  };
+
+  const handleToggleGroup = (groupName: string) => {
+    const group = filterGroups.find(g => g.name === groupName);
+    if (!group) return;
+
+    const allMembersSelected = group.members.every(m => userFilter.includes(m));
+    if (allMembersSelected) {
+      // Deselect all members of the group
+      setUserFilter(userFilter.filter(f => !group.members.includes(f)));
+    } else {
+      // Select all members of the group
+      const newFilter = [...userFilter];
+      group.members.forEach(m => {
+        if (!newFilter.includes(m)) {
+          newFilter.push(m);
+        }
+      });
+      setUserFilter(newFilter);
     }
   };
 
@@ -1133,20 +1200,41 @@ export default function DashboardPage() {
         </header>
 
         {isAdmin && (
-          <div className="mb-6 bg-white dark:bg-[#252525] rounded-lg p-4 shadow-sm">
-            <div className="flex justify-between items-center mb-3">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Filter by Team Members
-              </label>
-              {userFilter.length > 0 && (
-                <button
-                  onClick={() => setUserFilter([])}
-                  className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 underline"
-                >
-                  Clear All
-                </button>
-              )}
-            </div>
+          <div className="mb-6 bg-white dark:bg-[#252525] rounded-lg shadow-sm">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="w-full flex justify-between items-center p-4 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] rounded-lg transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  🔍 Filters
+                </span>
+                {userFilter.length > 0 && (
+                  <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs rounded-full font-medium">
+                    {userFilter.length} active
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {userFilter.length > 0 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setUserFilter([]);
+                    }}
+                    className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 underline"
+                  >
+                    Clear All
+                  </button>
+                )}
+                <span className={`transform transition-transform ${showFilters ? 'rotate-180' : ''}`}>
+                  ▼
+                </span>
+              </div>
+            </button>
+
+            {showFilters && (
+              <div className="p-4 pt-0 border-t border-gray-200 dark:border-gray-700 mt-2">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {TEAM_MEMBERS.map(member => (
                 <label key={member} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-[#2d2d2d] p-2 rounded">
@@ -1181,9 +1269,113 @@ export default function DashboardPage() {
                 <span className="text-sm text-gray-500 dark:text-gray-400 italic">Unassigned</span>
               </label>
             </div>
+
+            {/* Filter Groups */}
+            {filterGroups.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Custom Groups
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {filterGroups.map(group => {
+                    const allMembersSelected = group.members.every(m => userFilter.includes(m));
+                    return (
+                      <div key={group.name} className="relative group/item">
+                        <label
+                          className="flex items-center gap-2 cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-900/20 p-2 rounded border border-purple-200 dark:border-purple-800"
+                          title={`Members: ${group.members.join(', ')}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={allMembersSelected}
+                            onChange={() => handleToggleGroup(group.name)}
+                            className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500"
+                          />
+                          <span className="text-sm text-purple-700 dark:text-purple-300 font-medium">{group.name}</span>
+                        </label>
+                        <button
+                          onClick={() => handleDeleteGroup(group.name)}
+                          className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs opacity-0 group-hover/item:opacity-100 transition-opacity"
+                          title="Delete group"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Create Group Button */}
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              {!showCreateGroup ? (
+                <button
+                  onClick={() => setShowCreateGroup(true)}
+                  className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium"
+                >
+                  + Create Custom Group
+                </button>
+              ) : (
+                <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Create New Group</h3>
+                  <input
+                    type="text"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder="Group name (e.g., Kings)"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-3 text-gray-900 dark:text-gray-200 dark:bg-[#2d2d2d]"
+                  />
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Select Members</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {TEAM_MEMBERS.map(member => (
+                        <label key={member} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded">
+                          <input
+                            type="checkbox"
+                            checked={newGroupMembers.includes(member)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewGroupMembers([...newGroupMembers, member]);
+                              } else {
+                                setNewGroupMembers(newGroupMembers.filter(m => m !== member));
+                              }
+                            }}
+                            className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded"
+                          />
+                          <span className="text-sm text-gray-900 dark:text-gray-200">{member}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleCreateGroup}
+                      disabled={!newGroupName.trim() || newGroupMembers.length === 0}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+                    >
+                      Create Group
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowCreateGroup(false);
+                        setNewGroupName('');
+                        setNewGroupMembers([]);
+                      }}
+                      className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {userFilter.length > 0 && (
               <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
                 Showing tasks for: {userFilter.map(f => f === 'null' ? 'Unassigned' : f).join(', ')}
+              </div>
+            )}
               </div>
             )}
           </div>

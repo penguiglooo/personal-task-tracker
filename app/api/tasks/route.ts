@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
     const newTask = {
       task_id: taskId,
       title: taskData.title || '',
+      description: taskData.description || null,
       company: taskData.company,
       week: taskData.week,
       status: taskData.status || 'todo',
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
       activity_log: [{
         id: `${Date.now()}-created`,
         timestamp: new Date().toISOString(),
-        user: 'System',
+        user: session.user.name || 'System',
         action: 'created task'
       }],
       is_backlog: taskData.isBacklog || taskData.week === null,

@@ -78,12 +78,11 @@ function HomeView({ tasks, currentUserName, onTaskClick, isAdmin }: {
   isAdmin: boolean;
 }) {
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const next7Days = new Date(today);
   next7Days.setDate(next7Days.getDate() + 7);
-  const next7DaysStr = next7Days.toISOString().split('T')[0];
+  const next7DaysStr = `${next7Days.getFullYear()}-${String(next7Days.getMonth() + 1).padStart(2, '0')}-${String(next7Days.getDate()).padStart(2, '0')}`;
 
   // Filter tasks for current user (or all tasks if admin viewing all)
   const userTasks = tasks.filter(task =>
@@ -98,10 +97,10 @@ function HomeView({ tasks, currentUserName, onTaskClick, isAdmin }: {
     done: userTasks.filter(t => t.status === 'done').length,
   };
 
-  // Today's tasks (due today)
+  // Today's tasks (due today, not completed)
   const todaysTasks = userTasks.filter(task => {
     const taskDate = task.dueDate?.split('T')[0];
-    return taskDate === todayStr;
+    return task.status !== 'done' && taskDate === todayStr;
   });
 
   // Upcoming deadlines (next 7 days, excluding today)
@@ -188,16 +187,16 @@ function HomeView({ tasks, currentUserName, onTaskClick, isAdmin }: {
           <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{stats.todo}</div>
           <div className="text-sm text-gray-600 dark:text-gray-400">To Do</div>
         </div>
-        <div className="bg-white dark:bg-[#2d2d2d] border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">{stats.inProgress}</div>
+        <div className="bg-white dark:bg-[#2d2d2d] border border-gray-200 dark:border-[#404040] rounded-lg p-6">
+          <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{stats.inProgress}</div>
           <div className="text-sm text-gray-600 dark:text-gray-400">In Progress</div>
         </div>
-        <div className="bg-white dark:bg-[#2d2d2d] border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
-          <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mb-1">{stats.review}</div>
+        <div className="bg-white dark:bg-[#2d2d2d] border border-gray-200 dark:border-[#404040] rounded-lg p-6">
+          <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{stats.review}</div>
           <div className="text-sm text-gray-600 dark:text-gray-400">In Review</div>
         </div>
-        <div className="bg-white dark:bg-[#2d2d2d] border border-green-200 dark:border-green-800 rounded-lg p-6">
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">{stats.done}</div>
+        <div className="bg-white dark:bg-[#2d2d2d] border border-gray-200 dark:border-[#404040] rounded-lg p-6">
+          <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{stats.done}</div>
           <div className="text-sm text-gray-600 dark:text-gray-400">Completed</div>
         </div>
       </div>
@@ -223,8 +222,8 @@ function HomeView({ tasks, currentUserName, onTaskClick, isAdmin }: {
         </div>
 
         {/* Overdue Tasks - Right */}
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
-          <h2 className="text-xl font-bold text-red-800 dark:text-red-300 mb-4">
+        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#373737] rounded-lg p-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
             ⚠️ Overdue Tasks ({overdueTasks.length})
           </h2>
           {overdueTasks.length > 0 ? (
@@ -1192,332 +1191,349 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen p-6 bg-gray-100 dark:bg-[#191919] transition-colors">
-      <div className="max-w-7xl mx-auto">
-        <header className="mb-6 flex justify-between items-start">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">January 2026 Dashboard</h1>
-            <p className="text-gray-600 dark:text-gray-300">Muncho & Foan Command Center</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Logged in as {session?.user?.name} ({isAdmin ? 'Admin' : 'Viewer'})
-            </p>
-          </div>
-          <div className="flex gap-3 items-center">
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="relative inline-flex items-center h-7 w-14 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              style={{ backgroundColor: darkMode ? '#3b82f6' : '#cbd5e1' }}
-            >
-              <span className="sr-only">Toggle dark mode</span>
-              <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                  darkMode ? 'translate-x-8' : 'translate-x-1'
-                }`}
-              />
-              <span className={`absolute text-xs transition-opacity ${darkMode ? 'left-1.5 opacity-100' : 'left-1.5 opacity-0'}`}>
-                🌙
-              </span>
-              <span className={`absolute text-xs transition-opacity ${darkMode ? 'right-1.5 opacity-0' : 'right-1.5 opacity-100'}`}>
-                ☀️
-              </span>
-            </button>
-            {isAdmin && (
-              <button
-                onClick={() => setShowResetPassword(true)}
-                className="px-4 py-2 bg-white dark:bg-[#373737] text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-[#404040]"
-              >
-                Reset Password
-              </button>
-            )}
-            <button
-              onClick={() => signOut({ callbackUrl: '/login' })}
-              className="px-4 py-2 bg-gray-800 dark:bg-[#373737] text-white rounded-lg hover:bg-gray-900 dark:hover:bg-[#404040]"
-            >
-              Sign Out
-            </button>
-          </div>
-        </header>
-
-        {/* Search Bar */}
-        <div className="mb-4">
-          <div className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="🔍 Search tasks, descriptions, subtasks..."
-              className="w-full px-4 py-3 pl-10 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-200 bg-white dark:bg-[#252525] placeholder-gray-500 dark:placeholder-gray-400"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-          {searchQuery && (
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Found {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} matching "{searchQuery}"
-            </p>
-          )}
+    <div className="min-h-screen flex bg-gray-100 dark:bg-[#191919] transition-colors">
+      {/* Left Sidebar */}
+      <div className="w-64 bg-white dark:bg-[#1a1a1a] border-r border-gray-200 dark:border-gray-800 flex flex-col fixed h-screen">
+        {/* Logo/Header */}
+        <div className="px-6 h-[72px] flex flex-col justify-center border-b border-gray-200 dark:border-gray-800 shrink-0">
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">Task Tracker</h1>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            {session?.user?.name} ({isAdmin ? 'Admin' : 'Viewer'})
+          </p>
         </div>
 
-        {isAdmin && (
-          <div className="mb-6 bg-white dark:bg-[#252525] rounded-lg shadow-sm">
+        {/* Navigation */}
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          <button
+            onClick={() => setView('home')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              view === 'home'
+                ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
+                : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+            }`}
+          >
+            <span>🏠</span>
+            <span>Home</span>
+          </button>
+          <button
+            onClick={() => setView('calendar')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              view === 'calendar'
+                ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
+                : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+            }`}
+          >
+            <span>📅</span>
+            <span>Calendar</span>
+          </button>
+          <button
+            onClick={() => setView('backlog')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              view === 'backlog'
+                ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
+                : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+            }`}
+          >
+            <span>📋</span>
+            <span>Backlog</span>
+          </button>
+
+          <div className="pt-4 pb-2">
+            <p className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Weeks
+            </p>
+          </div>
+
+          {[1, 2, 3, 4].map(week => (
             <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="w-full flex justify-between items-center p-4 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] rounded-lg transition-colors"
+              key={week}
+              onClick={() => setView(`week${week}`)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                view === `week${week}`
+                  ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
+                  : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+              }`}
             >
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  🔍 Filters
-                </span>
-                {userFilter.length > 0 && (
-                  <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs rounded-full font-medium">
-                    {userFilter.length} active
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
+              <span>W{week}</span>
+              <span className="text-xs">{[1,8,16,24][week-1]}-{[7,15,23,31][week-1]} Jan</span>
+            </button>
+          ))}
+
+          <div className="pt-4 pb-2">
+            <p className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Insights
+            </p>
+          </div>
+
+          <button
+            onClick={() => setView('analytics')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              view === 'analytics'
+                ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
+                : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+            }`}
+          >
+            <span>📊</span>
+            <span>Analytics</span>
+          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setView('changelog')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                view === 'changelog'
+                  ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
+                  : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+              }`}
+            >
+              <span>📝</span>
+              <span>Changelog</span>
+            </button>
+          )}
+        </nav>
+
+        {/* Bottom Actions */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-2 shrink-0">
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#252525] transition-colors"
+          >
+            <span>{darkMode ? '🌙' : '☀️'}</span>
+            <span>{darkMode ? 'Dark Mode' : 'Light Mode'}</span>
+          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setShowResetPassword(true)}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#252525] transition-colors"
+            >
+              <span>🔑</span>
+              <span>Reset Password</span>
+            </button>
+          )}
+          <button
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          >
+            <span>🚪</span>
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col ml-64">
+        {/* Top Bar with Search and Filter */}
+        <div className="bg-white dark:bg-[#1a1a1a] border-b border-gray-200 dark:border-gray-800 px-4 h-[72px] flex items-center relative">
+          <div className="flex gap-3 items-center w-full">
+            {/* Search Button/Input */}
+            <div className="relative flex-1 max-w-md">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search tasks..."
+                className="w-full px-3 py-2 pl-9 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-[#252525] placeholder-gray-500 dark:placeholder-gray-400"
+              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Filter Button */}
+            {isAdmin && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    showFilters || userFilter.length > 0
+                      ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-gray-200 border-gray-300 dark:border-gray-700'
+                      : 'bg-white dark:bg-[#252525] text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#2d2d2d]'
+                  }`}
+                >
+                  <span>🔍</span>
+                  <span>Filters</span>
+                  {userFilter.length > 0 && (
+                    <span className="px-1.5 py-0.5 bg-gray-700 dark:bg-gray-600 text-white text-xs rounded-full font-medium">
+                      {userFilter.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* Filter Panel */}
+                {showFilters && (
+                  <div className="absolute top-full right-0 mt-2 w-[600px] max-h-[500px] overflow-y-auto p-4 bg-white dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg z-50">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Filter by Team Member</h3>
                 {userFilter.length > 0 && (
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setUserFilter([]);
-                    }}
+                    onClick={() => setUserFilter([])}
                     className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 underline"
                   >
                     Clear All
                   </button>
                 )}
-                <span className={`transform transition-transform ${showFilters ? 'rotate-180' : ''}`}>
-                  ▼
-                </span>
               </div>
-            </button>
 
-            {showFilters && (
-              <div className="p-4 pt-0 border-t border-gray-200 dark:border-gray-700 mt-2">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {TEAM_MEMBERS.map(member => (
-                <label key={member} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-[#2d2d2d] p-2 rounded">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {TEAM_MEMBERS.map(member => (
+                  <label key={member} className="flex items-center gap-2 cursor-pointer hover:bg-white dark:hover:bg-[#2d2d2d] p-2 rounded">
+                    <input
+                      type="checkbox"
+                      checked={userFilter.includes(member)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setUserFilter([...userFilter, member]);
+                        } else {
+                          setUserFilter(userFilter.filter(f => f !== member));
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-900 dark:text-gray-200">{member}</span>
+                  </label>
+                ))}
+                <label className="flex items-center gap-2 cursor-pointer hover:bg-white dark:hover:bg-[#2d2d2d] p-2 rounded">
                   <input
                     type="checkbox"
-                    checked={userFilter.includes(member)}
+                    checked={userFilter.includes('null')}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setUserFilter([...userFilter, member]);
+                        setUserFilter([...userFilter, 'null']);
                       } else {
-                        setUserFilter(userFilter.filter(f => f !== member));
+                        setUserFilter(userFilter.filter(f => f !== 'null'));
                       }
                     }}
                     className="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
                   />
-                  <span className="text-sm text-gray-900 dark:text-gray-200">{member}</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400 italic">Unassigned</span>
                 </label>
-              ))}
-              <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-[#2d2d2d] p-2 rounded">
-                <input
-                  type="checkbox"
-                  checked={userFilter.includes('null')}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setUserFilter([...userFilter, 'null']);
-                    } else {
-                      setUserFilter(userFilter.filter(f => f !== 'null'));
-                    }
-                  }}
-                  className="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-500 dark:text-gray-400 italic">Unassigned</span>
-              </label>
-            </div>
-
-            {/* Filter Groups */}
-            {filterGroups.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Custom Groups
-                </label>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {filterGroups.map(group => {
-                    const allMembersSelected = group.members.every(m => userFilter.includes(m));
-                    return (
-                      <div key={group.name} className="relative group/item">
-                        <label
-                          className="flex items-center gap-2 cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-900/20 p-2 rounded border border-purple-200 dark:border-purple-800"
-                          title={`Members: ${group.members.join(', ')}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={allMembersSelected}
-                            onChange={() => handleToggleGroup(group.name)}
-                            className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500"
-                          />
-                          <span className="text-sm text-purple-700 dark:text-purple-300 font-medium">{group.name}</span>
-                        </label>
-                        <button
-                          onClick={() => handleDeleteGroup(group.name)}
-                          className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs opacity-0 group-hover/item:opacity-100 transition-opacity"
-                          title="Delete group"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
-            )}
 
-            {/* Create Group Button */}
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              {!showCreateGroup ? (
-                <button
-                  onClick={() => setShowCreateGroup(true)}
-                  className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium"
-                >
-                  + Create Custom Group
-                </button>
-              ) : (
-                <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Create New Group</h3>
-                  <input
-                    type="text"
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                    placeholder="Group name (e.g., Kings)"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-3 text-gray-900 dark:text-gray-200 dark:bg-[#2d2d2d]"
-                  />
-                  <div className="mb-3">
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Select Members</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {TEAM_MEMBERS.map(member => (
-                        <label key={member} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded">
-                          <input
-                            type="checkbox"
-                            checked={newGroupMembers.includes(member)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setNewGroupMembers([...newGroupMembers, member]);
-                              } else {
-                                setNewGroupMembers(newGroupMembers.filter(m => m !== member));
-                              }
-                            }}
-                            className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded"
-                          />
-                          <span className="text-sm text-gray-900 dark:text-gray-200">{member}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleCreateGroup}
-                      disabled={!newGroupName.trim() || newGroupMembers.length === 0}
-                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
-                    >
-                      Create Group
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowCreateGroup(false);
-                        setNewGroupName('');
-                        setNewGroupMembers([]);
-                      }}
-                      className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm"
-                    >
-                      Cancel
-                    </button>
+              {/* Filter Groups */}
+              {filterGroups.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    Custom Groups
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {filterGroups.map(group => {
+                      const allMembersSelected = group.members.every(m => userFilter.includes(m));
+                      return (
+                        <div key={group.name} className="relative group/item">
+                          <label
+                            className="flex items-center gap-2 cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-900/20 p-2 rounded border border-purple-200 dark:border-purple-800"
+                            title={`Members: ${group.members.join(', ')}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={allMembersSelected}
+                              onChange={() => handleToggleGroup(group.name)}
+                              className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500"
+                            />
+                            <span className="text-sm text-purple-700 dark:text-purple-300 font-medium">{group.name}</span>
+                          </label>
+                          <button
+                            onClick={() => handleDeleteGroup(group.name)}
+                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs opacity-0 group-hover/item:opacity-100 transition-opacity"
+                            title="Delete group"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
-            </div>
 
-            {userFilter.length > 0 && (
-              <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
-                Showing tasks for: {userFilter.map(f => f === 'null' ? 'Unassigned' : f).join(', ')}
+              {/* Create Group Button */}
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                {!showCreateGroup ? (
+                  <button
+                    onClick={() => setShowCreateGroup(true)}
+                    className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium"
+                  >
+                    + Create Custom Group
+                  </button>
+                ) : (
+                  <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Create New Group</h3>
+                    <input
+                      type="text"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      placeholder="Group name (e.g., Kings)"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-3 text-sm text-gray-900 dark:text-gray-200 dark:bg-[#2d2d2d]"
+                    />
+                    <div className="mb-3">
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Select Members</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {TEAM_MEMBERS.map(member => (
+                          <label key={member} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded">
+                            <input
+                              type="checkbox"
+                              checked={newGroupMembers.includes(member)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setNewGroupMembers([...newGroupMembers, member]);
+                                } else {
+                                  setNewGroupMembers(newGroupMembers.filter(m => m !== member));
+                                }
+                              }}
+                              className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded"
+                            />
+                            <span className="text-sm text-gray-900 dark:text-gray-200">{member}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleCreateGroup}
+                        disabled={!newGroupName.trim() || newGroupMembers.length === 0}
+                        className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+                      >
+                        Create
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowCreateGroup(false);
+                          setNewGroupName('');
+                          setNewGroupMembers([]);
+                        }}
+                        className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+                )}
               </div>
             )}
-              </div>
+
+            {searchQuery && (
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                {filteredTasks.length} result{filteredTasks.length !== 1 ? 's' : ''}
+              </p>
             )}
           </div>
-        )}
-
-        <div className="mb-6 flex gap-2 flex-wrap">
-          <button
-            onClick={() => setView('home')}
-            className={`px-4 py-2 rounded-lg font-medium ${
-              view === 'home'
-                ? 'bg-blue-600 dark:bg-blue-700 text-white'
-                : 'bg-white dark:bg-[#252525] text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2d2d2d]'
-            }`}
-          >
-            🏠 Home
-          </button>
-          <button
-            onClick={() => setView('calendar')}
-            className={`px-4 py-2 rounded-lg font-medium ${
-              view === 'calendar'
-                ? 'bg-gray-800 dark:bg-[#373737] text-white'
-                : 'bg-white dark:bg-[#252525] text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2d2d2d]'
-            }`}
-          >
-            📅 Calendar
-          </button>
-          <button
-            onClick={() => setView('backlog')}
-            className={`px-4 py-2 rounded-lg font-medium ${
-              view === 'backlog'
-                ? 'bg-purple-600 dark:bg-purple-700 text-white'
-                : 'bg-white dark:bg-[#252525] text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2d2d2d]'
-            }`}
-          >
-            📋 Backlog
-          </button>
-          {[1, 2, 3, 4].map(week => (
-            <button
-              key={week}
-              onClick={() => setView(`week${week}`)}
-              className={`px-4 py-2 rounded-lg font-medium ${
-                view === `week${week}`
-                  ? 'bg-gray-800 dark:bg-[#373737] text-white'
-                  : 'bg-white dark:bg-[#252525] text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2d2d2d]'
-              }`}
-            >
-              Week {week} ({[1,8,16,24][week-1]}-{[7,15,23,31][week-1]} Jan)
-            </button>
-          ))}
-          <button
-            onClick={() => setView('analytics')}
-            className={`px-4 py-2 rounded-lg font-medium ${
-              view === 'analytics'
-                ? 'bg-blue-600 dark:bg-blue-700 text-white'
-                : 'bg-white dark:bg-[#252525] text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2d2d2d]'
-            }`}
-          >
-            📊 Analytics
-          </button>
-          {isAdmin && (
-            <button
-              onClick={() => setView('changelog')}
-              className={`px-4 py-2 rounded-lg font-medium ${
-                view === 'changelog'
-                  ? 'bg-indigo-600 dark:bg-indigo-700 text-white'
-                  : 'bg-white dark:bg-[#252525] text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2d2d2d]'
-              }`}
-            >
-              📝 Changelog
-            </button>
-          )}
         </div>
+
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-auto p-6 bg-gray-100 dark:bg-[#191919]">
 
         <div className="mb-6">
           {view === 'calendar' ? (
             <>
-              <div className="mb-4 bg-white dark:bg-[#252525] rounded-lg p-4 shadow-sm flex items-center justify-between border dark:border-[#373737]">
+              <div className="mb-4 bg-white dark:bg-[#252525] rounded-lg p-4 shadow-sm flex items-center justify-between border border-gray-200 dark:border-[#373737]">
                 <div className="flex gap-2">
                   <button
                     onClick={() => setCalendarViewMode('month')}
@@ -1682,6 +1698,7 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -1997,18 +2014,36 @@ function CalendarView({
             const { dateStr, day, month } = dateObj;
             const isDecember = month === 12;
 
+            // Check if this is today
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayStr = today.toISOString().split('T')[0];
+            const isToday = dateStr === todayStr;
+
             // Get tasks that span this day
             const dayTasks = tasks.filter(t => isDateInTaskRange(dateStr, t));
 
             return (
               <div
                 key={`${weekIdx}-${dayIdx}`}
-                className={`min-h-24 p-2 border dark:border-gray-700 rounded ${isDecember ? 'bg-gray-50 dark:bg-[#1e1e1e]' : 'bg-white dark:bg-[#2a2a2a] hover:bg-gray-50 dark:hover:bg-[#303030]'}`}
+                className={`min-h-24 p-2 border rounded ${
+                  isToday
+                    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 dark:border-blue-600 border-2'
+                    : isDecember
+                      ? 'bg-gray-50 dark:bg-[#1e1e1e] dark:border-gray-700'
+                      : 'bg-white dark:bg-[#2a2a2a] hover:bg-gray-50 dark:hover:bg-[#303030] dark:border-gray-700'
+                }`}
                 onDragOver={handleDayDragOver}
                 onDrop={(e) => handleDayDrop(e, dateStr)}
                 onMouseEnter={() => handleDayMouseEnter(dateStr)}
               >
-                <div className={`font-semibold mb-1 ${isDecember ? 'text-gray-400 dark:text-gray-600' : 'dark:text-gray-300'}`}>
+                <div className={`font-semibold mb-1 ${
+                  isToday
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : isDecember
+                      ? 'text-gray-400 dark:text-gray-600'
+                      : 'dark:text-gray-300'
+                }`}>
                   {day} {isDecember ? 'Dec' : ''}
                 </div>
                 <div className="space-y-1">
@@ -2116,32 +2151,23 @@ function ChangelogView({ tasks }: { tasks: Task[] }) {
     return '📝';
   };
 
-  const getActionColor = (action: string) => {
-    if (action.includes('created')) return 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300';
-    if (action.includes('moved') || action.includes('status')) return 'bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300';
-    if (action.includes('assigned')) return 'bg-purple-50 dark:bg-purple-900 border-purple-200 dark:border-purple-800 text-purple-800 dark:text-purple-300';
-    if (action.includes('deleted')) return 'bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300';
-    if (action.includes('completed')) return 'bg-emerald-50 dark:bg-emerald-900 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300';
-    return 'bg-gray-50 dark:bg-[#2d2d2d] border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-300';
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg p-6">
-        <h2 className="text-3xl font-bold mb-2">Activity Changelog</h2>
-        <p className="text-indigo-100">Track all task movements and changes across the team</p>
+      <div className="mb-6">
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Activity Changelog</h2>
+        <p className="text-gray-600 dark:text-gray-400">Track all task movements and changes across the team</p>
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-[#252525] rounded-lg p-4 shadow-sm border dark:border-[#373737]">
+      <div className="bg-white dark:bg-[#252525] rounded-lg p-4 border border-gray-200 dark:border-gray-800">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Filter by User</label>
             <select
               value={filterUser}
               onChange={(e) => setFilterUser(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-200 dark:bg-[#2d2d2d]"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-gray-500 text-gray-900 dark:text-gray-200 dark:bg-[#2d2d2d]"
             >
               <option value="all">All Users</option>
               {TEAM_MEMBERS.map(member => (
@@ -2154,7 +2180,7 @@ function ChangelogView({ tasks }: { tasks: Task[] }) {
             <select
               value={filterAction}
               onChange={(e) => setFilterAction(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-200 dark:bg-[#2d2d2d]"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-gray-500 text-gray-900 dark:text-gray-200 dark:bg-[#2d2d2d]"
             >
               <option value="all">All Actions</option>
               <option value="created">Created</option>
@@ -2171,7 +2197,7 @@ function ChangelogView({ tasks }: { tasks: Task[] }) {
               placeholder="Search task names..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-200 dark:bg-[#2d2d2d]"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-gray-500 text-gray-900 dark:text-gray-200 dark:bg-[#2d2d2d]"
             />
           </div>
         </div>
@@ -2186,7 +2212,7 @@ function ChangelogView({ tasks }: { tasks: Task[] }) {
                 setFilterAction('all');
                 setSearchQuery('');
               }}
-              className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 underline"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 underline"
             >
               Clear All Filters
             </button>
@@ -2197,21 +2223,21 @@ function ChangelogView({ tasks }: { tasks: Task[] }) {
       {/* Activity Timeline */}
       <div className="space-y-6">
         {Object.entries(groupedByDate).length === 0 ? (
-          <div className="bg-white dark:bg-[#252525] rounded-lg p-12 text-center border dark:border-[#373737]">
+          <div className="bg-white dark:bg-[#252525] rounded-lg p-12 text-center border border-gray-200 dark:border-gray-800">
             <p className="text-gray-500 dark:text-gray-400 text-lg">No activity logs found</p>
             <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Activity tracking is now enabled for all future changes</p>
           </div>
         ) : (
           Object.entries(groupedByDate).map(([date, activities]) => (
             <div key={date} className="space-y-3">
-              <div className="sticky top-0 bg-gray-100 dark:bg-[#2d2d2d] px-4 py-2 rounded-lg border dark:border-[#404040]">
+              <div className="sticky top-0 bg-gray-100 dark:bg-[#1a1a1a] px-4 py-2 rounded-lg">
                 <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300">{date}</h3>
               </div>
               <div className="space-y-2">
                 {activities.map((activity) => (
                   <div
                     key={activity.id}
-                    className={`border-l-4 rounded-lg p-4 ${getActionColor(activity.action)}`}
+                    className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-gray-800 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors"
                   >
                     <div className="flex items-start gap-3">
                       <span className="text-2xl">{getActionIcon(activity.action)}</span>
@@ -2234,11 +2260,11 @@ function ChangelogView({ tasks }: { tasks: Task[] }) {
                               </span>
                             </p>
                             {activity.changes && (
-                              <div className="mt-2 text-xs bg-white dark:bg-black bg-opacity-50 dark:bg-opacity-30 rounded p-2">
+                              <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
                                 <span className="font-medium">{activity.changes.field}:</span>{' '}
-                                <span className="line-through text-gray-600 dark:text-gray-400">{activity.changes.oldValue}</span>
+                                <span className="line-through">{activity.changes.oldValue}</span>
                                 {' → '}
-                                <span className="font-semibold">{activity.changes.newValue}</span>
+                                <span className="font-semibold text-gray-900 dark:text-gray-200">{activity.changes.newValue}</span>
                               </div>
                             )}
                           </div>
@@ -3245,10 +3271,26 @@ function TaskModal({
         throw new Error('Delete failed');
       }
 
+      // Update local state
+      const updatedAttachments = editedTask.attachments?.filter(att => att.id !== attachmentId) || [];
       setEditedTask(prev => ({
         ...prev,
-        attachments: prev.attachments?.filter(att => att.id !== attachmentId) || []
+        attachments: updatedAttachments
       }));
+
+      // Persist to database immediately
+      await onUpdate(task.id, {
+        attachments: updatedAttachments,
+        activityLog: [
+          ...(editedTask.activityLog || []),
+          {
+            id: `${Date.now()}-attachment-deleted`,
+            timestamp: new Date().toISOString(),
+            user: 'User',
+            action: `deleted attachment`
+          }
+        ]
+      });
     } catch (error) {
       console.error('Delete error:', error);
       alert('Failed to delete attachment. Please try again.');

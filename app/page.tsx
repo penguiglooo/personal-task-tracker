@@ -64,6 +64,18 @@ interface Task {
 
 const TEAM_MEMBERS = ['Dhruv', 'Akaash', 'Swapnil', 'Sneha', 'Aniket', 'Saurabh'];
 const PROJECT_BOARDS = ['Apps', 'Ideas', 'Jokes', 'Stories', 'Learning', 'Reading', 'Watching', 'Tools', 'Shopping', 'Personal'] as const;
+const PROJECT_ICONS: Record<string, string> = {
+  'Apps': '📱',
+  'Ideas': '💡',
+  'Jokes': '😄',
+  'Stories': '📖',
+  'Learning': '🎓',
+  'Reading': '📚',
+  'Watching': '🎬',
+  'Tools': '🔧',
+  'Shopping': '🛒',
+  'Personal': '👤'
+};
 const STATUS_COLUMNS = ['todo', 'inProgress', 'review', 'done'] as const;
 const STATUS_LABELS = {
   todo: 'To Do',
@@ -315,6 +327,9 @@ export default function DashboardPage() {
   const [newGroupMembers, setNewGroupMembers] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [boardsCollapsed, setBoardsCollapsed] = useState(false);
+  const [weeksCollapsed, setWeeksCollapsed] = useState(false);
+  const [insightsCollapsed, setInsightsCollapsed] = useState(false);
 
   // Personal tracker - always admin mode
   const isAdmin = true;
@@ -1219,13 +1234,18 @@ export default function DashboardPage() {
             <span>Backlog</span>
           </button>
 
+          {/* Boards Section - Collapsible */}
           <div className="pt-4 pb-2">
-            <p className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Boards
-            </p>
+            <button
+              onClick={() => setBoardsCollapsed(!boardsCollapsed)}
+              className="w-full flex items-center justify-between px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+            >
+              <span>Boards</span>
+              <span className="text-base">{boardsCollapsed ? '▶' : '▼'}</span>
+            </button>
           </div>
 
-          {PROJECT_BOARDS.map(project => (
+          {!boardsCollapsed && PROJECT_BOARDS.map(project => (
             <button
               key={project}
               onClick={() => {
@@ -1238,18 +1258,23 @@ export default function DashboardPage() {
                   : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
               }`}
             >
-              <span className="text-xs">📁</span>
+              <span>{PROJECT_ICONS[project]}</span>
               <span>{project}</span>
             </button>
           ))}
 
+          {/* Weeks Section - Collapsible */}
           <div className="pt-4 pb-2">
-            <p className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Weeks
-            </p>
+            <button
+              onClick={() => setWeeksCollapsed(!weeksCollapsed)}
+              className="w-full flex items-center justify-between px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+            >
+              <span>Weeks</span>
+              <span className="text-base">{weeksCollapsed ? '▶' : '▼'}</span>
+            </button>
           </div>
 
-          {[1, 2, 3, 4].map(week => (
+          {!weeksCollapsed && [1, 2, 3, 4].map(week => (
             <button
               key={week}
               onClick={() => setView(`week${week}`)}
@@ -1264,35 +1289,44 @@ export default function DashboardPage() {
             </button>
           ))}
 
+          {/* Insights Section - Collapsible */}
           <div className="pt-4 pb-2">
-            <p className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Insights
-            </p>
+            <button
+              onClick={() => setInsightsCollapsed(!insightsCollapsed)}
+              className="w-full flex items-center justify-between px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+            >
+              <span>Insights</span>
+              <span className="text-base">{insightsCollapsed ? '▶' : '▼'}</span>
+            </button>
           </div>
 
-          <button
-            onClick={() => setView('analytics')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              view === 'analytics'
-                ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
-                : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
-            }`}
-          >
-            <span>📊</span>
-            <span>Analytics</span>
-          </button>
-          {isAdmin && (
-            <button
-              onClick={() => setView('changelog')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                view === 'changelog'
-                  ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
-                  : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
-              }`}
-            >
-              <span>📝</span>
-              <span>Changelog</span>
-            </button>
+          {!insightsCollapsed && (
+            <>
+              <button
+                onClick={() => setView('analytics')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  view === 'analytics'
+                    ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
+                    : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+                }`}
+              >
+                <span>📊</span>
+                <span>Analytics</span>
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setView('changelog')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    view === 'changelog'
+                      ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
+                      : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+                  }`}
+                >
+                  <span>📝</span>
+                  <span>Changelog</span>
+                </button>
+              )}
+            </>
           )}
         </nav>
 

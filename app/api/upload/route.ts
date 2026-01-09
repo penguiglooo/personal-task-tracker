@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getServerSession } from 'next-auth';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -8,11 +7,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    if (!session?.user?.name) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    // No auth - personal task tracker
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const taskId = formData.get('taskId') as string;
@@ -56,7 +51,7 @@ export async function POST(request: NextRequest) {
       type: file.type,
       size: file.size,
       uploadedAt: new Date().toISOString(),
-      uploadedBy: session.user.name,
+      uploadedBy: 'User',
     };
 
     // Update task in database with new attachment
@@ -93,11 +88,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    if (!session?.user?.name) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    // No auth - personal task tracker
     const { searchParams } = new URL(request.url);
     const taskId = searchParams.get('taskId');
     const attachmentId = searchParams.get('attachmentId');

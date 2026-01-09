@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
 interface Comment {
@@ -297,7 +296,6 @@ function HomeView({ tasks, currentUserName, onTaskClick, isAdmin }: {
 }
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession();
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
@@ -310,10 +308,6 @@ export default function DashboardPage() {
   const [userFilter, setUserFilter] = useState<string[]>([]);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [newTaskStatus, setNewTaskStatus] = useState<string>('todo');
-  const [showResetPassword, setShowResetPassword] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
-  const [resetNewPassword, setResetNewPassword] = useState('');
-  const [resetLoading, setResetLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [filterGroups, setFilterGroups] = useState<{ name: string; members: string[] }[]>([]);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -322,7 +316,8 @@ export default function DashboardPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const isAdmin = (session?.user as any)?.role === 'admin';
+  // Personal tracker - always admin mode
+  const isAdmin = true;
 
   // Fuzzy search function
   const fuzzyMatch = (text: string, query: string): boolean => {
@@ -375,23 +370,10 @@ export default function DashboardPage() {
     localStorage.setItem('filterGroups', JSON.stringify(filterGroups));
   }, [filterGroups]);
 
+  // Fetch tasks on mount - no auth needed
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login');
-    } else if (status === 'authenticated' && (session?.user as any)?.mustChangePassword) {
-      router.push('/change-password');
-    }
-  }, [status, session, router]);
-
-  useEffect(() => {
-    if (status === 'authenticated') {
-      fetchTasks();
-      // Set default filter to current user for admins (Dhruv, Akaash, Swapnil)
-      if (isAdmin && session?.user?.name) {
-        setUserFilter([session.user.name]);
-      }
-    }
-  }, [status, isAdmin]);
+    fetchTasks();
+  }, []);
 
   useEffect(() => {
     // Apply user filter and search
@@ -452,7 +434,7 @@ export default function DashboardPage() {
     try {
       // Find the current task to track changes
       const currentTask = tasks.find(t => t.id === taskId);
-      const userName = session?.user?.name || 'Unknown';
+      const userName = 'User';
 
       // Generate activity logs for changes
       const newActivityLogs: ActivityLog[] = [];
@@ -732,7 +714,7 @@ export default function DashboardPage() {
 
       if (response.ok) {
         const newComment = await response.json();
-        const userName = session?.user?.name || 'Unknown';
+        const userName = 'User';
         const currentTask = tasks.find(t => t.id === taskId);
 
         // Add activity log for comment
@@ -817,12 +799,8 @@ export default function DashboardPage() {
       if (validFilters.length > 0) {
         autoAssignees = validFilters;
       }
-    } else {
-      // For non-admin users: always auto-assign themselves
-      if (session?.user?.name) {
-        autoAssignees = [session.user.name];
-      }
     }
+    // Personal tracker - no auto-assignment needed
 
     // Create optimistic task with temporary ID
     const tempId = `temp-${Date.now()}`;
@@ -926,37 +904,6 @@ export default function DashboardPage() {
   const canDeleteTask = (taskId: string) => {
     const ORIGINAL_TASK_IDS = Array.from({length: 42}, (_, i) => String(i + 1));
     return !ORIGINAL_TASK_IDS.includes(taskId);
-  };
-
-  const handleResetPassword = async () => {
-    if (!resetEmail || !resetNewPassword) {
-      alert('Please enter email and new password');
-      return;
-    }
-
-    setResetLoading(true);
-    try {
-      const response = await fetch('/api/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resetEmail, newPassword: resetNewPassword })
-      });
-
-      if (response.ok) {
-        alert(`Password reset successfully for ${resetEmail}`);
-        setShowResetPassword(false);
-        setResetEmail('');
-        setResetNewPassword('');
-      } else {
-        const error = await response.json();
-        alert(error.error || 'Failed to reset password');
-      }
-    } catch (error) {
-      console.error('Failed to reset password:', error);
-      alert('Failed to reset password');
-    } finally {
-      setResetLoading(false);
-    }
   };
 
   const handleDragStart = (e: React.DragEvent, task: Task) => {
@@ -1216,16 +1163,12 @@ export default function DashboardPage() {
     );
   };
 
-  if (loading || status === 'loading') {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-xl text-gray-600">Loading...</div>
       </div>
     );
-  }
-
-  if (status === 'unauthenticated') {
-    return null;
   }
 
   return (
@@ -1236,7 +1179,7 @@ export default function DashboardPage() {
         <div className="px-6 h-[72px] flex flex-col justify-center border-b border-gray-200 dark:border-gray-800 shrink-0">
           <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">Task Tracker</h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            {session?.user?.name} ({isAdmin ? 'Admin' : 'Viewer'})
+            Personal
           </p>
         </div>
 
@@ -1361,22 +1304,6 @@ export default function DashboardPage() {
           >
             <span>{darkMode ? '🌙' : '☀️'}</span>
             <span>{darkMode ? 'Dark Mode' : 'Light Mode'}</span>
-          </button>
-          {isAdmin && (
-            <button
-              onClick={() => setShowResetPassword(true)}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#252525] transition-colors"
-            >
-              <span>🔑</span>
-              <span>Reset Password</span>
-            </button>
-          )}
-          <button
-            onClick={() => signOut({ callbackUrl: '/login' })}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-          >
-            <span>🚪</span>
-            <span>Sign Out</span>
           </button>
         </div>
       </div>
@@ -1656,12 +1583,12 @@ export default function DashboardPage() {
           ) : view === 'home' ? (
             <HomeView
               tasks={filteredTasks}
-              currentUserName={(session?.user as any)?.name}
+              currentUserName="User"
               onTaskClick={setSelectedTask}
               isAdmin={isAdmin}
             />
           ) : view === 'analytics' ? (
-            <AnalyticsView tasks={tasks} currentUserName={(session?.user as any)?.name} isAdmin={isAdmin} />
+            <AnalyticsView tasks={tasks} currentUserName="User" isAdmin={isAdmin} />
           ) : view === 'changelog' ? (
             <ChangelogView tasks={tasks} />
           ) : view === 'backlog' ? (
@@ -1690,83 +1617,6 @@ export default function DashboardPage() {
             isAdmin={isAdmin}
             getDefaultDateForWeek={getDefaultDateForWeek}
           />
-        )}
-
-        {showResetPassword && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-md w-full p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">Reset User Password</h2>
-                <button
-                  onClick={() => {
-                    setShowResetPassword(false);
-                    setResetEmail('');
-                    setResetNewPassword('');
-                  }}
-                  className="text-gray-500 hover:text-gray-700 text-2xl"
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    User Email
-                  </label>
-                  <select
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
-                  >
-                    <option value="">Select user...</option>
-                    <option value="aniket.jadhav@muncho.in">Aniket (aniket.jadhav@muncho.in)</option>
-                    <option value="sneha.kumar@muncho.in">Sneha (sneha.kumar@muncho.in)</option>
-                    <option value="akaash@muncho.app">Akaash (akaash@muncho.app)</option>
-                    <option value="swapnil.sinha@muncho.in">Swapnil (swapnil.sinha@muncho.in)</option>
-                    <option value="dhruv@muncho.in">Dhruv (dhruv@muncho.in)</option>
-                    <option value="saurabh@foan.ai">Saurabh (saurabh@foan.ai)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    New Password
-                  </label>
-                  <input
-                    type="text"
-                    value={resetNewPassword}
-                    onChange={(e) => setResetNewPassword(e.target.value)}
-                    placeholder="Enter new password"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    User will be required to change this password on next login
-                  </p>
-                </div>
-
-                <div className="flex gap-2 pt-4">
-                  <button
-                    onClick={handleResetPassword}
-                    disabled={resetLoading}
-                    className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                  >
-                    {resetLoading ? 'Resetting...' : 'Reset Password'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowResetPassword(false);
-                      setResetEmail('');
-                      setResetNewPassword('');
-                    }}
-                    className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
         )}
         </div>
       </div>

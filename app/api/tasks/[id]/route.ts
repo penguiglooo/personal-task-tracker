@@ -1,43 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
+    // No auth - personal task tracker
     const { id } = await params;
-    const userRole = (session.user as any).role;
-    const userName = session.user.name;
 
     const { data: task } = await supabaseAdmin.from('tasks').select('*').eq('task_id', id).single();
     if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
 
     const updates = await request.json();
-
-    // Viewers can move tasks (change status) and update subtasks
-    if (userRole === 'viewer') {
-      // Check if this is a task assigned to the viewer
-      const isAssignedToViewer = task.assignees && task.assignees.includes(userName);
-
-      // Viewers can only update their assigned tasks
-      if (!isAssignedToViewer) {
-        return NextResponse.json({ error: 'You can only update tasks assigned to you' }, { status: 403 });
-      }
-
-      // Only allow status and subtasks updates for viewers
-      const allowedUpdates = ['status', 'subtasks'];
-      const updateKeys = Object.keys(updates);
-      const hasDisallowedUpdates = updateKeys.some(key => !allowedUpdates.includes(key));
-
-      // If trying to update disallowed fields, block it
-      if (hasDisallowedUpdates) {
-        return NextResponse.json({ error: 'You can only move tasks and update subtasks' }, { status: 403 });
-      }
-    }
-
     const updateData: any = {};
     if (updates.title !== undefined) updateData.title = updates.title;
     if (updates.description !== undefined) updateData.description = updates.description;
@@ -90,10 +62,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if ((session.user as any).role !== 'admin') return NextResponse.json({ error: 'Only admins can delete tasks' }, { status: 403 });
-
+    // No auth - personal task tracker
     const { id } = await params;
 
     // Prevent deletion of original tasks (task IDs 1-42)

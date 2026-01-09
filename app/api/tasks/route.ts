@@ -1,24 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
-    const userRole = (session.user as any).role;
-    const userName = session.user.name;
-
-    let query = supabaseAdmin.from('tasks').select('*').order('due_date', { ascending: true });
-
-    // Viewers can only see tasks assigned to them
-    if (userRole === 'viewer') {
-      query = query.contains('assignees', [userName]);
-    }
-
-    const { data: tasks, error } = await query;
+    // No auth - personal task tracker, fetch all tasks
+    const { data: tasks, error } = await supabaseAdmin
+      .from('tasks')
+      .select('*')
+      .order('due_date', { ascending: true });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     
     const formattedTasks = tasks.map(task => ({
@@ -51,10 +40,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if ((session.user as any).role !== 'admin') return NextResponse.json({ error: 'Only admins can create tasks' }, { status: 403 });
-
+    // No auth - personal task tracker
     const taskData = await request.json();
     const taskId = Date.now().toString();
 
@@ -73,7 +59,7 @@ export async function POST(request: NextRequest) {
       activity_log: [{
         id: `${Date.now()}-created`,
         timestamp: new Date().toISOString(),
-        user: session.user.name || 'System',
+        user: 'User',
         action: 'created task'
       }],
       is_backlog: taskData.isBacklog || taskData.week === null,

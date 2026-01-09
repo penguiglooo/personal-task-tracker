@@ -821,7 +821,11 @@ export default function DashboardPage() {
       }
     }
 
-    const newTask: Partial<Task> = {
+    // Create optimistic task with temporary ID
+    const tempId = `temp-${Date.now()}`;
+    const optimisticTask: Task = {
+      _id: tempId,
+      id: tempId,
       title: '',
       company: 'Muncho',
       week: weekNum,
@@ -830,28 +834,57 @@ export default function DashboardPage() {
       dueDate: weekNum === null ? new Date().toISOString().split('T')[0] : getDefaultDateForWeek(weekNum),
       isBacklog: weekNum === null,
       createdAt: new Date().toISOString(),
+      comments: [],
+      subtasks: [],
+      attachments: [],
+      activityLog: [],
     };
 
+    // Optimistically add to state and open modal immediately
+    setTasks(prev => [...prev, optimisticTask]);
+    setFilteredTasks(prev => [...prev, optimisticTask]);
+    setSelectedTask(optimisticTask);
+    setIsCreatingTask(false);
+
+    // Then sync with backend
     try {
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newTask),
+        body: JSON.stringify({
+          title: optimisticTask.title,
+          company: optimisticTask.company,
+          week: optimisticTask.week,
+          status: optimisticTask.status,
+          assignees: optimisticTask.assignees,
+          dueDate: optimisticTask.dueDate,
+          isBacklog: optimisticTask.isBacklog,
+          createdAt: optimisticTask.createdAt,
+        }),
       });
 
       if (response.ok) {
         const createdTask = await response.json();
-        await fetchTasks();
+        // Replace optimistic task with real task from backend
+        setTasks(prev => prev.map(t => t.id === tempId ? createdTask : t));
+        setFilteredTasks(prev => prev.map(t => t.id === tempId ? createdTask : t));
         setSelectedTask(createdTask);
-        setIsCreatingTask(false);
       } else {
         const error = await response.json();
+        // Revert optimistic update on error
+        setTasks(prev => prev.filter(t => t.id !== tempId));
+        setFilteredTasks(prev => prev.filter(t => t.id !== tempId));
+        setSelectedTask(null);
         alert(error.error || 'Failed to create task');
       }
     } catch (error) {
       console.error('Failed to create task:', error);
+      // Revert optimistic update on error
+      setTasks(prev => prev.filter(t => t.id !== tempId));
+      setFilteredTasks(prev => prev.filter(t => t.id !== tempId));
+      setSelectedTask(null);
       alert('Failed to create task');
     }
   };

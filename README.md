@@ -188,3 +188,4 @@ npm start
 ## Support
 
 For issues or questions, contact the development team.
+# Force rebuild

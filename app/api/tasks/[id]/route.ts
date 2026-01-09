@@ -51,6 +51,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       updateData.is_backlog = updates.week === null || updates.isBacklog;
     }
     if (updates.isBacklog !== undefined) updateData.is_backlog = updates.isBacklog;
+    if (updates.project !== undefined) updateData.project = updates.project;
     if (updates.comments) updateData.comments = updates.comments;
     if (updates.subtasks !== undefined) updateData.subtasks = updates.subtasks;
     if (updates.difficulty !== undefined) updateData.difficulty = updates.difficulty;
@@ -79,6 +80,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       attachments: updated.attachments || [],
       activityLog: updated.activity_log || [],
       isBacklog: updated.is_backlog || updated.week === null,
+      project: updated.project,
       createdAt: updated.created_at || updated.due_date
     });
   } catch (error: any) {

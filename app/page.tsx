@@ -57,12 +57,14 @@ interface Task {
   attachments?: Attachment[];
   activityLog?: ActivityLog[];
   isBacklog?: boolean;
+  project?: string | null;
   createdAt: string;
   difficulty?: 'Easy' | 'Medium' | 'Hard';
   importance?: 'Low' | 'Medium' | 'High' | 'Critical';
 }
 
 const TEAM_MEMBERS = ['Dhruv', 'Akaash', 'Swapnil', 'Sneha', 'Aniket', 'Saurabh'];
+const PROJECT_BOARDS = ['Apps', 'Ideas', 'Jokes', 'Stories', 'Learning', 'Reading', 'Watching', 'Tools', 'Shopping', 'Personal'] as const;
 const STATUS_COLUMNS = ['todo', 'inProgress', 'review', 'done'] as const;
 const STATUS_LABELS = {
   todo: 'To Do',
@@ -300,6 +302,7 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [view, setView] = useState('home');
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [calendarViewMode, setCalendarViewMode] = useState<'month' | 'week'>('month');
   const [selectedWeekForWeekView, setSelectedWeekForWeekView] = useState(1);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -833,6 +836,7 @@ export default function DashboardPage() {
       assignees: autoAssignees,
       dueDate: weekNum === null ? new Date().toISOString().split('T')[0] : getDefaultDateForWeek(weekNum),
       isBacklog: weekNum === null,
+      project: view === 'project-board' && selectedProject ? selectedProject : null,
       createdAt: new Date().toISOString(),
       comments: [],
       subtasks: [],
@@ -861,6 +865,7 @@ export default function DashboardPage() {
           assignees: optimisticTask.assignees,
           dueDate: optimisticTask.dueDate,
           isBacklog: optimisticTask.isBacklog,
+          project: optimisticTask.project,
           createdAt: optimisticTask.createdAt,
         }),
       });
@@ -1273,6 +1278,30 @@ export default function DashboardPage() {
 
           <div className="pt-4 pb-2">
             <p className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Boards
+            </p>
+          </div>
+
+          {PROJECT_BOARDS.map(project => (
+            <button
+              key={project}
+              onClick={() => {
+                setSelectedProject(project);
+                setView('project-board');
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                view === 'project-board' && selectedProject === project
+                  ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
+                  : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+              }`}
+            >
+              <span className="text-xs">📁</span>
+              <span>{project}</span>
+            </button>
+          ))}
+
+          <div className="pt-4 pb-2">
+            <p className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               Weeks
             </p>
           </div>
@@ -1637,6 +1666,14 @@ export default function DashboardPage() {
             <ChangelogView tasks={tasks} />
           ) : view === 'backlog' ? (
             renderBacklog()
+          ) : view === 'project-board' && selectedProject ? (
+            <ProjectBoardView
+              projectName={selectedProject}
+              tasks={filteredTasks.filter(t => t.project === selectedProject)}
+              onTaskClick={setSelectedTask}
+              onCreateTask={() => createTask(null, 'todo')}
+              isAdmin={isAdmin}
+            />
           ) : (
             renderKanban(parseInt(view.replace('week', '')))
           )}
@@ -1848,6 +1885,132 @@ function TaskCard({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ProjectBoardView({
+  projectName,
+  tasks,
+  onTaskClick,
+  onCreateTask,
+  isAdmin
+}: {
+  projectName: string;
+  tasks: Task[];
+  onTaskClick: (task: Task) => void;
+  onCreateTask: () => void;
+  isAdmin: boolean;
+}) {
+  const statusGroups = {
+    todo: tasks.filter(t => t.status === 'todo'),
+    inProgress: tasks.filter(t => t.status === 'inProgress'),
+    review: tasks.filter(t => t.status === 'review'),
+    done: tasks.filter(t => t.status === 'done')
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">📁 {projectName}</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            {tasks.length} {tasks.length === 1 ? 'item' : 'items'} in this board
+          </p>
+        </div>
+        {isAdmin && (
+          <button
+            onClick={onCreateTask}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <span className="text-lg">+</span>
+            Add Item
+          </button>
+        )}
+      </div>
+
+      <div className="bg-white dark:bg-[#252525] rounded-lg p-4 border border-gray-200 dark:border-[#373737]">
+        <div className="space-y-2">
+          {tasks.length === 0 ? (
+            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+              <p className="text-lg">No items in this board yet</p>
+              {isAdmin && <p className="text-sm mt-2">Click "Add Item" to get started</p>}
+            </div>
+          ) : (
+            tasks.map(task => (
+              <div
+                key={task.id}
+                onClick={() => onTaskClick(task)}
+                className="p-4 border border-gray-200 dark:border-[#373737] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2d2d2d] cursor-pointer transition-colors"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">{task.title || 'Untitled'}</h3>
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        task.status === 'done' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300' :
+                        task.status === 'review' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300' :
+                        task.status === 'inProgress' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300' :
+                        'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
+                      }`}>
+                        {task.status === 'inProgress' ? 'In Progress' :
+                         task.status === 'todo' ? 'To Do' :
+                         task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                      </span>
+                    </div>
+                    {task.description && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">{task.description}</p>
+                    )}
+                    <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                      {task.difficulty && (
+                        <span className={`px-2 py-0.5 rounded ${
+                          task.difficulty === 'Hard' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300' :
+                          task.difficulty === 'Medium' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300' :
+                          'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300'
+                        }`}>
+                          {task.difficulty}
+                        </span>
+                      )}
+                      {task.importance && (
+                        <span className={`px-2 py-0.5 rounded ${
+                          task.importance === 'Critical' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300' :
+                          task.importance === 'High' ? 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-300' :
+                          task.importance === 'Medium' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300' :
+                          'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
+                        }`}>
+                          {task.importance}
+                        </span>
+                      )}
+                      {task.subtasks && task.subtasks.length > 0 && (
+                        <span>
+                          ✅ {task.subtasks.filter(st => st.completed).length}/{task.subtasks.length}
+                        </span>
+                      )}
+                      {task.comments && task.comments.length > 0 && (
+                        <span>💬 {task.comments.length}</span>
+                      )}
+                      {task.attachments && task.attachments.length > 0 && (
+                        <span>📎 {task.attachments.length}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-4 gap-4">
+        {Object.entries(statusGroups).map(([status, statusTasks]) => (
+          <div key={status} className="bg-white dark:bg-[#252525] rounded-lg p-4 border border-gray-200 dark:border-[#373737]">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              {status === 'inProgress' ? 'In Progress' : status.charAt(0).toUpperCase() + status.slice(1)}
+            </h3>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{statusTasks.length}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

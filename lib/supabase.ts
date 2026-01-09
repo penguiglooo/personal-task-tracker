@@ -64,6 +64,7 @@ export type Database = {
           attachments: any[];
           activity_log: any[];
           is_backlog: boolean;
+          project: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -85,6 +86,7 @@ export type Database = {
           attachments?: any[];
           activity_log?: any[];
           is_backlog?: boolean;
+          project?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -104,6 +106,7 @@ export type Database = {
           attachments?: any[];
           activity_log?: any[];
           is_backlog?: boolean;
+          project?: string | null;
           updated_at?: string;
         };
       };

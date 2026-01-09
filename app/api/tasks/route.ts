@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
       attachments: task.attachments || [],
       activityLog: task.activity_log || [],
       isBacklog: task.is_backlog || task.week === null,
+      project: task.project,
       createdAt: task.created_at || task.due_date
     }));
 
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
         action: 'created task'
       }],
       is_backlog: taskData.isBacklog || taskData.week === null,
+      project: taskData.project || null,
       created_at: taskData.createdAt || new Date().toISOString()
     };
 
@@ -102,6 +104,7 @@ export async function POST(request: NextRequest) {
       attachments: data.attachments || [],
       activityLog: data.activity_log || [],
       isBacklog: data.is_backlog || data.week === null,
+      project: data.project,
       createdAt: data.created_at
     });
   } catch (error: any) {

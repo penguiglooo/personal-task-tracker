@@ -20,17 +20,27 @@ export function BoardView({
   onUpdateTask,
   isAdmin,
 }: BoardViewProps) {
-  const [boardConfig, setBoardConfig] = useState<BoardConfig>(() =>
-    loadBoardConfig(projectName)
-  );
+  const [boardConfig, setBoardConfig] = useState<BoardConfig | null>(null);
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [editingColumnName, setEditingColumnName] = useState('');
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
 
+  // Load board config on mount (client-side only)
+  useEffect(() => {
+    setBoardConfig(loadBoardConfig(projectName));
+  }, [projectName]);
+
   // Save board config when it changes
   useEffect(() => {
-    saveBoardConfig(boardConfig);
+    if (boardConfig) {
+      saveBoardConfig(boardConfig);
+    }
   }, [boardConfig]);
+
+  // Don't render until config is loaded
+  if (!boardConfig) {
+    return <div className="flex items-center justify-center h-full">Loading...</div>;
+  }
 
   const addColumn = () => {
     const newColumn: BoardColumn = {

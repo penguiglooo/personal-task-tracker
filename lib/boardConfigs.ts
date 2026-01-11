@@ -47,12 +47,17 @@ export function getBoardConfig(boardId: string): BoardConfig {
 
 // Save board configuration to localStorage
 export function saveBoardConfig(config: BoardConfig): void {
+  if (typeof window === 'undefined') return;
   const key = `board-config-${config.boardId}`;
   localStorage.setItem(key, JSON.stringify(config));
 }
 
 // Load board configuration from localStorage
 export function loadBoardConfig(boardId: string): BoardConfig {
+  if (typeof window === 'undefined') {
+    return getBoardConfig(boardId);
+  }
+
   const key = `board-config-${boardId}`;
   const saved = localStorage.getItem(key);
 

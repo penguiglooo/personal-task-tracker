@@ -1234,6 +1234,32 @@ export default function DashboardPage() {
             <span>Backlog</span>
           </button>
 
+          {/* Weeks Section - Collapsible */}
+          <div className="pt-4 pb-2">
+            <button
+              onClick={() => setWeeksCollapsed(!weeksCollapsed)}
+              className="w-full flex items-center justify-between px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+            >
+              <span>Weeks</span>
+              <span className="text-base">{weeksCollapsed ? '▶' : '▼'}</span>
+            </button>
+          </div>
+
+          {!weeksCollapsed && [1, 2, 3, 4].map(week => (
+            <button
+              key={week}
+              onClick={() => setView(`week${week}`)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                view === `week${week}`
+                  ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
+                  : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+              }`}
+            >
+              <span>W{week}</span>
+              <span className="text-xs">{[1,8,16,24][week-1]}-{[7,15,23,31][week-1]} Jan</span>
+            </button>
+          ))}
+
           {/* Boards Section - Collapsible */}
           <div className="pt-4 pb-2">
             <button
@@ -1260,32 +1286,6 @@ export default function DashboardPage() {
             >
               <span>{PROJECT_ICONS[project]}</span>
               <span>{project}</span>
-            </button>
-          ))}
-
-          {/* Weeks Section - Collapsible */}
-          <div className="pt-4 pb-2">
-            <button
-              onClick={() => setWeeksCollapsed(!weeksCollapsed)}
-              className="w-full flex items-center justify-between px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-            >
-              <span>Weeks</span>
-              <span className="text-base">{weeksCollapsed ? '▶' : '▼'}</span>
-            </button>
-          </div>
-
-          {!weeksCollapsed && [1, 2, 3, 4].map(week => (
-            <button
-              key={week}
-              onClick={() => setView(`week${week}`)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                view === `week${week}`
-                  ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
-                  : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
-              }`}
-            >
-              <span>W{week}</span>
-              <span className="text-xs">{[1,8,16,24][week-1]}-{[7,15,23,31][week-1]} Jan</span>
             </button>
           ))}
 

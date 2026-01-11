@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { BoardView } from '@/components/BoardView';
 
 interface Comment {
   id: string;
@@ -16,7 +14,6 @@ interface Subtask {
   id: string;
   text: string;
   completed: boolean;
-  assignee: string | null;
 }
 
 interface Attachment {
@@ -49,7 +46,6 @@ interface Task {
   company: 'Muncho' | 'Foan' | 'Both';
   week: number | null;
   status: 'todo' | 'inProgress' | 'review' | 'done';
-  assignees: string[];
   startDate?: string;
   dueDate: string;
   comments: Comment[];
@@ -57,26 +53,11 @@ interface Task {
   attachments?: Attachment[];
   activityLog?: ActivityLog[];
   isBacklog?: boolean;
-  project?: string | null;
   createdAt: string;
   difficulty?: 'Easy' | 'Medium' | 'Hard';
   importance?: 'Low' | 'Medium' | 'High' | 'Critical';
 }
 
-const TEAM_MEMBERS = ['Dhruv', 'Akaash', 'Swapnil', 'Sneha', 'Aniket', 'Saurabh'];
-const PROJECT_BOARDS = ['Apps', 'Ideas', 'Jokes', 'Stories', 'Learning', 'Reading', 'Watching', 'Tools', 'Shopping', 'Personal'] as const;
-const PROJECT_ICONS: Record<string, string> = {
-  'Apps': '📱',
-  'Ideas': '💡',
-  'Jokes': '😄',
-  'Stories': '📖',
-  'Learning': '🎓',
-  'Reading': '📚',
-  'Watching': '🎬',
-  'Tools': '🔧',
-  'Shopping': '🛒',
-  'Personal': '👤'
-};
 const STATUS_COLUMNS = ['todo', 'inProgress', 'review', 'done'] as const;
 const STATUS_LABELS = {
   todo: 'To Do',
@@ -85,11 +66,9 @@ const STATUS_LABELS = {
   done: 'Done'
 };
 
-function HomeView({ tasks, currentUserName, onTaskClick, isAdmin }: {
+function HomeView({ tasks, onTaskClick }: {
   tasks: Task[];
-  currentUserName: string;
   onTaskClick: (task: Task) => void;
-  isAdmin: boolean;
 }) {
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -98,39 +77,34 @@ function HomeView({ tasks, currentUserName, onTaskClick, isAdmin }: {
   next7Days.setDate(next7Days.getDate() + 7);
   const next7DaysStr = `${next7Days.getFullYear()}-${String(next7Days.getMonth() + 1).padStart(2, '0')}-${String(next7Days.getDate()).padStart(2, '0')}`;
 
-  // Filter tasks for current user (or all tasks if admin viewing all)
-  const userTasks = tasks.filter(task =>
-    isAdmin || task.assignees.includes(currentUserName)
-  );
-
   // Calculate statistics
   const stats = {
-    todo: userTasks.filter(t => t.status === 'todo').length,
-    inProgress: userTasks.filter(t => t.status === 'inProgress').length,
-    review: userTasks.filter(t => t.status === 'review').length,
-    done: userTasks.filter(t => t.status === 'done').length,
+    todo: tasks.filter(t => t.status === 'todo').length,
+    inProgress: tasks.filter(t => t.status === 'inProgress').length,
+    review: tasks.filter(t => t.status === 'review').length,
+    done: tasks.filter(t => t.status === 'done').length,
   };
 
   // Today's tasks (due today, not completed)
-  const todaysTasks = userTasks.filter(task => {
+  const todaysTasks = tasks.filter(task => {
     const taskDate = task.dueDate?.split('T')[0];
     return task.status !== 'done' && taskDate === todayStr;
   });
 
   // Upcoming deadlines (next 7 days, excluding today)
-  const upcomingTasks = userTasks.filter(task => {
+  const upcomingTasks = tasks.filter(task => {
     const taskDate = task.dueDate?.split('T')[0];
     return taskDate && taskDate > todayStr && taskDate <= next7DaysStr;
   }).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
   // Overdue tasks
-  const overdueTasks = userTasks.filter(task => {
+  const overdueTasks = tasks.filter(task => {
     const taskDate = task.dueDate?.split('T')[0];
     return task.status !== 'done' && taskDate && taskDate < todayStr;
   });
 
   // Recent activity (tasks with recent activity logs)
-  const recentActivity = userTasks
+  const recentActivity = tasks
     .filter(task => task.activityLog && task.activityLog.length > 0)
     .sort((a, b) => {
       const aTime = a.activityLog && a.activityLog.length > 0
@@ -188,7 +162,7 @@ function HomeView({ tasks, currentUserName, onTaskClick, isAdmin }: {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Welcome back, {currentUserName}!
+          Welcome back!
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
           Here's your task overview for today
@@ -309,31 +283,17 @@ function HomeView({ tasks, currentUserName, onTaskClick, isAdmin }: {
 }
 
 export default function DashboardPage() {
-  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [view, setView] = useState('home');
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [calendarViewMode, setCalendarViewMode] = useState<'month' | 'week'>('month');
   const [selectedWeekForWeekView, setSelectedWeekForWeekView] = useState(1);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userFilter, setUserFilter] = useState<string[]>([]);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [newTaskStatus, setNewTaskStatus] = useState<string>('todo');
   const [darkMode, setDarkMode] = useState(false);
-  const [filterGroups, setFilterGroups] = useState<{ name: string; members: string[] }[]>([]);
-  const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [newGroupName, setNewGroupName] = useState('');
-  const [newGroupMembers, setNewGroupMembers] = useState<string[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [boardsCollapsed, setBoardsCollapsed] = useState(true);
-  const [weeksCollapsed, setWeeksCollapsed] = useState(true);
-  const [insightsCollapsed, setInsightsCollapsed] = useState(false);
-
-  // Personal tracker - always admin mode
-  const isAdmin = true;
 
   // Fuzzy search function
   const fuzzyMatch = (text: string, query: string): boolean => {
@@ -360,15 +320,6 @@ export default function DashboardPage() {
     if (savedDarkMode === 'true') {
       setDarkMode(true);
     }
-    // Load filter groups from localStorage
-    const savedGroups = localStorage.getItem('filterGroups');
-    if (savedGroups) {
-      try {
-        setFilterGroups(JSON.parse(savedGroups));
-      } catch (e) {
-        console.error('Failed to load filter groups', e);
-      }
-    }
   }, []);
 
   // Save dark mode preference and apply to document
@@ -381,93 +332,14 @@ export default function DashboardPage() {
     }
   }, [darkMode]);
 
-  // Save filter groups to localStorage
-  useEffect(() => {
-    localStorage.setItem('filterGroups', JSON.stringify(filterGroups));
-  }, [filterGroups]);
-
-  // Fetch tasks on mount - no auth needed
   useEffect(() => {
     fetchTasks();
   }, []);
 
-  // Keyboard shortcuts
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger shortcuts when typing in inputs or textareas
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-        return;
-      }
-
-      const key = e.key.toLowerCase();
-
-      switch (key) {
-        case 'h':
-          setView('home');
-          setSelectedProject(null);
-          break;
-        case 'c':
-          setView('calendar');
-          setSelectedProject(null);
-          break;
-        case 'b':
-          setView('backlog');
-          setSelectedProject(null);
-          break;
-        case 'a':
-          setView('analytics');
-          setSelectedProject(null);
-          break;
-        case '1':
-          setView('week1');
-          setSelectedProject(null);
-          break;
-        case '2':
-          setView('week2');
-          setSelectedProject(null);
-          break;
-        case '3':
-          setView('week3');
-          setSelectedProject(null);
-          break;
-        case '4':
-          setView('week4');
-          setSelectedProject(null);
-          break;
-        case 'n':
-          createTask(null, 'todo');
-          break;
-        case 'f':
-          setShowFilters(!showFilters);
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showFilters]);
-
-  useEffect(() => {
-    // Apply user filter and search
+    // Apply search filter
     let filtered = tasks;
 
-    // Apply user filter
-    if (userFilter.length > 0) {
-      filtered = filtered.filter(task => {
-        // Handle 'null' filter for unassigned tasks
-        if (userFilter.includes('null')) {
-          if (!task.assignees || task.assignees.length === 0) return true;
-        }
-        // Check if task has any of the selected assignees
-        if (task.assignees && task.assignees.some(assignee => userFilter.includes(assignee))) {
-          return true;
-        }
-        return false;
-      });
-    }
-
-    // Apply search filter
     if (searchQuery.trim()) {
       filtered = filtered.filter(task => {
         // Search in title
@@ -486,7 +358,7 @@ export default function DashboardPage() {
     }
 
     setFilteredTasks(filtered);
-  }, [userFilter, tasks, searchQuery]);
+  }, [tasks, searchQuery]);
 
   const fetchTasks = async () => {
     try {
@@ -539,21 +411,6 @@ export default function DashboardPage() {
               field: 'Week',
               oldValue: currentTask.week || 'Backlog',
               newValue: updates.week || 'Backlog'
-            }
-          });
-        }
-
-        // Track assignee changes
-        if (updates.assignees && JSON.stringify(updates.assignees) !== JSON.stringify(currentTask.assignees)) {
-          newActivityLogs.push({
-            id: `${Date.now()}-assignees`,
-            timestamp: new Date().toISOString(),
-            user: userName,
-            action: `changed assignees`,
-            changes: {
-              field: 'Assignees',
-              oldValue: currentTask.assignees.join(', ') || 'None',
-              newValue: updates.assignees.join(', ') || 'None'
             }
           });
         }
@@ -616,21 +473,6 @@ export default function DashboardPage() {
             }
           }
 
-          // Check for assignee changes
-          for (const newSubtask of newSubtasks) {
-            const oldSubtask = oldSubtasks.find(st => st.id === newSubtask.id);
-            if (oldSubtask && oldSubtask.assignee !== newSubtask.assignee) {
-              const assigneeAction = newSubtask.assignee
-                ? `assigned "${newSubtask.text}" to ${newSubtask.assignee}`
-                : `unassigned "${newSubtask.text}"`;
-              newActivityLogs.push({
-                id: `${Date.now()}-subtask-assign-${newSubtask.id}`,
-                timestamp: new Date().toISOString(),
-                user: userName,
-                action: assigneeAction,
-              });
-            }
-          }
         }
 
         // Track title changes
@@ -827,120 +669,37 @@ export default function DashboardPage() {
     }
   };
 
-  const handleCreateGroup = () => {
-    if (newGroupName.trim() && newGroupMembers.length > 0) {
-      setFilterGroups([...filterGroups, { name: newGroupName.trim(), members: newGroupMembers }]);
-      setNewGroupName('');
-      setNewGroupMembers([]);
-      setShowCreateGroup(false);
-    }
-  };
-
-  const handleDeleteGroup = (groupName: string) => {
-    if (confirm(`Delete filter group "${groupName}"?`)) {
-      setFilterGroups(filterGroups.filter(g => g.name !== groupName));
-    }
-  };
-
-  const handleToggleGroup = (groupName: string) => {
-    const group = filterGroups.find(g => g.name === groupName);
-    if (!group) return;
-
-    const allMembersSelected = group.members.every(m => userFilter.includes(m));
-    if (allMembersSelected) {
-      // Deselect all members of the group
-      setUserFilter(userFilter.filter(f => !group.members.includes(f)));
-    } else {
-      // Select all members of the group
-      const newFilter = [...userFilter];
-      group.members.forEach(m => {
-        if (!newFilter.includes(m)) {
-          newFilter.push(m);
-        }
-      });
-      setUserFilter(newFilter);
-    }
-  };
-
   const createTask = async (weekNum: number | null, status: string) => {
-    // Auto-assign based on current filter
-    let autoAssignees: string[] = [];
-
-    if (isAdmin) {
-      // For admins: auto-assign if filtering by specific users (excluding 'null')
-      const validFilters = userFilter.filter(f => f !== 'null' && TEAM_MEMBERS.includes(f));
-      if (validFilters.length > 0) {
-        autoAssignees = validFilters;
-      }
-    }
-    // Personal tracker - no auto-assignment needed
-
-    // Create optimistic task with temporary ID
-    const tempId = `temp-${Date.now()}`;
-    const optimisticTask: Task = {
-      _id: tempId,
-      id: tempId,
+    const newTask: Partial<Task> = {
       title: '',
       company: 'Muncho',
       week: weekNum,
       status: status as any,
-      assignees: autoAssignees,
       dueDate: weekNum === null ? new Date().toISOString().split('T')[0] : getDefaultDateForWeek(weekNum),
       isBacklog: weekNum === null,
-      project: view === 'project-board' && selectedProject ? selectedProject : null,
       createdAt: new Date().toISOString(),
-      comments: [],
-      subtasks: [],
-      attachments: [],
-      activityLog: [],
     };
 
-    // Optimistically add to state and open modal immediately
-    setTasks(prev => [...prev, optimisticTask]);
-    setFilteredTasks(prev => [...prev, optimisticTask]);
-    setSelectedTask(optimisticTask);
-    setIsCreatingTask(false);
-
-    // Then sync with backend
     try {
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          title: optimisticTask.title,
-          company: optimisticTask.company,
-          week: optimisticTask.week,
-          status: optimisticTask.status,
-          assignees: optimisticTask.assignees,
-          dueDate: optimisticTask.dueDate,
-          isBacklog: optimisticTask.isBacklog,
-          project: optimisticTask.project,
-          createdAt: optimisticTask.createdAt,
-        }),
+        body: JSON.stringify(newTask),
       });
 
       if (response.ok) {
         const createdTask = await response.json();
-        // Replace optimistic task with real task from backend
-        setTasks(prev => prev.map(t => t.id === tempId ? createdTask : t));
-        setFilteredTasks(prev => prev.map(t => t.id === tempId ? createdTask : t));
+        await fetchTasks();
         setSelectedTask(createdTask);
+        setIsCreatingTask(false);
       } else {
         const error = await response.json();
-        // Revert optimistic update on error
-        setTasks(prev => prev.filter(t => t.id !== tempId));
-        setFilteredTasks(prev => prev.filter(t => t.id !== tempId));
-        setSelectedTask(null);
         alert(error.error || 'Failed to create task');
       }
     } catch (error) {
       console.error('Failed to create task:', error);
-      // Revert optimistic update on error
-      setTasks(prev => prev.filter(t => t.id !== tempId));
-      setFilteredTasks(prev => prev.filter(t => t.id !== tempId));
-      setSelectedTask(null);
       alert('Failed to create task');
     }
   };
@@ -1116,11 +875,6 @@ export default function DashboardPage() {
               {task.difficulty.charAt(0)}
             </span>
           )}
-          {task.assignees && task.assignees.length > 0 && (
-            <span className="bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 px-1.5 py-0.5 rounded">
-              👤 {task.assignees.join(', ')}
-            </span>
-          )}
         </div>
       </div>
     );
@@ -1131,20 +885,15 @@ export default function DashboardPage() {
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">📋 Backlog</h2>
             <p className="text-gray-600 dark:text-gray-300 text-sm">
-              {isAdmin
-                ? 'Tasks waiting to be assigned to a specific week. Click on a task to assign it to a week.'
-                : 'Tasks in backlog waiting to be scheduled.'
-              }
+              Tasks waiting to be assigned to a specific week. Click on a task to assign it to a week.
             </p>
           </div>
-          {isAdmin && (
-            <button
-              onClick={() => createTask(null, 'todo')}
-              className="px-4 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-900 dark:hover:bg-gray-600 text-sm font-medium"
-            >
-              + Add Backlog Task
-            </button>
-          )}
+          <button
+            onClick={() => createTask(null, 'todo')}
+            className="px-4 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-900 dark:hover:bg-gray-600 text-sm font-medium"
+          >
+            + Add Backlog Task
+          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-6">
@@ -1207,15 +956,13 @@ export default function DashboardPage() {
                   ({weekTasks.filter(t => t.status === status).length})
                 </span>
               </h3>
-              {isAdmin && (
-                <button
-                  onClick={() => createTask(weekNum, status)}
-                  className="w-6 h-6 flex items-center justify-center bg-gray-800 dark:bg-[#373737] text-white rounded hover:bg-gray-900 dark:hover:bg-[#404040] text-lg font-bold"
-                  title="Add new task"
-                >
-                  +
-                </button>
-              )}
+              <button
+                onClick={() => createTask(weekNum, status)}
+                className="w-6 h-6 flex items-center justify-center bg-gray-800 dark:bg-[#373737] text-white rounded hover:bg-gray-900 dark:hover:bg-[#404040] text-lg font-bold"
+                title="Add new task"
+              >
+                +
+              </button>
             </div>
             <div className="space-y-3">
               {weekTasks.filter(t => t.status === status).map(task => (
@@ -1252,7 +999,7 @@ export default function DashboardPage() {
         <div className="px-6 h-[72px] flex flex-col justify-center border-b border-gray-200 dark:border-gray-800 shrink-0">
           <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">Task Tracker</h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Personal
+            Personal Task Manager
           </p>
         </div>
 
@@ -1292,18 +1039,13 @@ export default function DashboardPage() {
             <span>Backlog</span>
           </button>
 
-          {/* Weeks Section - Collapsible */}
           <div className="pt-4 pb-2">
-            <button
-              onClick={() => setWeeksCollapsed(!weeksCollapsed)}
-              className="w-full flex items-center justify-between px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-            >
-              <span>Weeks</span>
-              <span className="text-base">{weeksCollapsed ? '▶' : '▼'}</span>
-            </button>
+            <p className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Weeks
+            </p>
           </div>
 
-          {!weeksCollapsed && [1, 2, 3, 4].map(week => (
+          {[1, 2, 3, 4].map(week => (
             <button
               key={week}
               onClick={() => setView(`week${week}`)}
@@ -1318,74 +1060,34 @@ export default function DashboardPage() {
             </button>
           ))}
 
-          {/* Boards Section - Collapsible */}
           <div className="pt-4 pb-2">
-            <button
-              onClick={() => setBoardsCollapsed(!boardsCollapsed)}
-              className="w-full flex items-center justify-between px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-            >
-              <span>Boards</span>
-              <span className="text-base">{boardsCollapsed ? '▶' : '▼'}</span>
-            </button>
+            <p className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Insights
+            </p>
           </div>
 
-          {!boardsCollapsed && PROJECT_BOARDS.map(project => (
-            <button
-              key={project}
-              onClick={() => {
-                setSelectedProject(project);
-                setView('project-board');
-              }}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                view === 'project-board' && selectedProject === project
-                  ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
-                  : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
-              }`}
-            >
-              <span>{PROJECT_ICONS[project]}</span>
-              <span>{project}</span>
-            </button>
-          ))}
-
-          {/* Insights Section - Collapsible */}
-          <div className="pt-4 pb-2">
-            <button
-              onClick={() => setInsightsCollapsed(!insightsCollapsed)}
-              className="w-full flex items-center justify-between px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-            >
-              <span>Insights</span>
-              <span className="text-base">{insightsCollapsed ? '▶' : '▼'}</span>
-            </button>
-          </div>
-
-          {!insightsCollapsed && (
-            <>
-              <button
-                onClick={() => setView('analytics')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  view === 'analytics'
-                    ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
-                    : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
-                }`}
-              >
-                <span>📊</span>
-                <span>Analytics</span>
-              </button>
-              {isAdmin && (
-                <button
-                  onClick={() => setView('changelog')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    view === 'changelog'
-                      ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
-                      : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
-                  }`}
-                >
-                  <span>📝</span>
-                  <span>Changelog</span>
-                </button>
-              )}
-            </>
-          )}
+          <button
+            onClick={() => setView('analytics')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              view === 'analytics'
+                ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
+                : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+            }`}
+          >
+            <span>📊</span>
+            <span>Analytics</span>
+          </button>
+          <button
+            onClick={() => setView('changelog')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              view === 'changelog'
+                ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
+                : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+            }`}
+          >
+            <span>📝</span>
+            <span>Changelog</span>
+          </button>
         </nav>
 
         {/* Bottom Actions */}
@@ -1424,181 +1126,6 @@ export default function DashboardPage() {
                 </button>
               )}
             </div>
-
-            {/* Filter Button */}
-            {isAdmin && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                    showFilters || userFilter.length > 0
-                      ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-gray-200 border-gray-300 dark:border-gray-700'
-                      : 'bg-white dark:bg-[#252525] text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#2d2d2d]'
-                  }`}
-                >
-                  <span>🔍</span>
-                  <span>Filters</span>
-                  {userFilter.length > 0 && (
-                    <span className="px-1.5 py-0.5 bg-gray-700 dark:bg-gray-600 text-white text-xs rounded-full font-medium">
-                      {userFilter.length}
-                    </span>
-                  )}
-                </button>
-
-                {/* Filter Panel */}
-                {showFilters && (
-                  <div className="absolute top-full right-0 mt-2 w-[600px] max-h-[500px] overflow-y-auto p-4 bg-white dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg z-50">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Filter by Team Member</h3>
-                {userFilter.length > 0 && (
-                  <button
-                    onClick={() => setUserFilter([])}
-                    className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 underline"
-                  >
-                    Clear All
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                {TEAM_MEMBERS.map(member => (
-                  <label key={member} className="flex items-center gap-2 cursor-pointer hover:bg-white dark:hover:bg-[#2d2d2d] p-2 rounded">
-                    <input
-                      type="checkbox"
-                      checked={userFilter.includes(member)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setUserFilter([...userFilter, member]);
-                        } else {
-                          setUserFilter(userFilter.filter(f => f !== member));
-                        }
-                      }}
-                      className="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-900 dark:text-gray-200">{member}</span>
-                  </label>
-                ))}
-                <label className="flex items-center gap-2 cursor-pointer hover:bg-white dark:hover:bg-[#2d2d2d] p-2 rounded">
-                  <input
-                    type="checkbox"
-                    checked={userFilter.includes('null')}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setUserFilter([...userFilter, 'null']);
-                      } else {
-                        setUserFilter(userFilter.filter(f => f !== 'null'));
-                      }
-                    }}
-                    className="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-500 dark:text-gray-400 italic">Unassigned</span>
-                </label>
-              </div>
-
-              {/* Filter Groups */}
-              {filterGroups.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                    Custom Groups
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                    {filterGroups.map(group => {
-                      const allMembersSelected = group.members.every(m => userFilter.includes(m));
-                      return (
-                        <div key={group.name} className="relative group/item">
-                          <label
-                            className="flex items-center gap-2 cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-900/20 p-2 rounded border border-purple-200 dark:border-purple-800"
-                            title={`Members: ${group.members.join(', ')}`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={allMembersSelected}
-                              onChange={() => handleToggleGroup(group.name)}
-                              className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500"
-                            />
-                            <span className="text-sm text-purple-700 dark:text-purple-300 font-medium">{group.name}</span>
-                          </label>
-                          <button
-                            onClick={() => handleDeleteGroup(group.name)}
-                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs opacity-0 group-hover/item:opacity-100 transition-opacity"
-                            title="Delete group"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Create Group Button */}
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                {!showCreateGroup ? (
-                  <button
-                    onClick={() => setShowCreateGroup(true)}
-                    className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium"
-                  >
-                    + Create Custom Group
-                  </button>
-                ) : (
-                  <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Create New Group</h3>
-                    <input
-                      type="text"
-                      value={newGroupName}
-                      onChange={(e) => setNewGroupName(e.target.value)}
-                      placeholder="Group name (e.g., Kings)"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg mb-3 text-sm text-gray-900 dark:text-gray-200 dark:bg-[#2d2d2d]"
-                    />
-                    <div className="mb-3">
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Select Members</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {TEAM_MEMBERS.map(member => (
-                          <label key={member} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded">
-                            <input
-                              type="checkbox"
-                              checked={newGroupMembers.includes(member)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setNewGroupMembers([...newGroupMembers, member]);
-                                } else {
-                                  setNewGroupMembers(newGroupMembers.filter(m => m !== member));
-                                }
-                              }}
-                              className="w-4 h-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded"
-                            />
-                            <span className="text-sm text-gray-900 dark:text-gray-200">{member}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleCreateGroup}
-                        disabled={!newGroupName.trim() || newGroupMembers.length === 0}
-                        className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
-                      >
-                        Create
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowCreateGroup(false);
-                          setNewGroupName('');
-                          setNewGroupMembers([]);
-                        }}
-                        className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-                )}
-              </div>
-            )}
 
             {searchQuery && (
               <p className="text-xs text-gray-600 dark:text-gray-400">
@@ -1659,7 +1186,6 @@ export default function DashboardPage() {
                   onTaskClick={setSelectedTask}
                   onTaskDrop={updateTask}
                   onCreateTask={() => createTask(1, 'todo')}
-                  isAdmin={isAdmin}
                 />
               ) : (
                 <WeekView
@@ -1668,32 +1194,20 @@ export default function DashboardPage() {
                   onTaskClick={setSelectedTask}
                   onTaskDrop={updateTask}
                   onCreateTask={() => createTask(selectedWeekForWeekView, 'todo')}
-                  isAdmin={isAdmin}
                 />
               )}
             </>
           ) : view === 'home' ? (
             <HomeView
               tasks={filteredTasks}
-              currentUserName="User"
               onTaskClick={setSelectedTask}
-              isAdmin={isAdmin}
             />
           ) : view === 'analytics' ? (
-            <AnalyticsView tasks={tasks} currentUserName="User" isAdmin={isAdmin} />
+            <AnalyticsView tasks={tasks} />
           ) : view === 'changelog' ? (
             <ChangelogView tasks={tasks} />
           ) : view === 'backlog' ? (
             renderBacklog()
-          ) : view === 'project-board' && selectedProject ? (
-            <BoardView
-              projectName={selectedProject}
-              tasks={filteredTasks.filter(t => t.project === selectedProject)}
-              onTaskClick={setSelectedTask}
-              onCreateTask={() => createTask(null, 'todo')}
-              onUpdateTask={updateTask}
-              isAdmin={isAdmin}
-            />
           ) : (
             renderKanban(parseInt(view.replace('week', '')))
           )}
@@ -1707,7 +1221,6 @@ export default function DashboardPage() {
             onAddComment={addComment}
             onDelete={deleteTask}
             canDelete={canDeleteTask(selectedTask.id)}
-            isAdmin={isAdmin}
             getDefaultDateForWeek={getDefaultDateForWeek}
           />
         )}
@@ -1797,13 +1310,6 @@ function TaskCard({
           </span>
         )}
       </div>
-      {task.assignees && task.assignees.length > 0 && (
-        <div className="text-xs mb-2">
-          <span className="bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 px-2 py-1 rounded">
-            {task.assignees.join(', ')}
-          </span>
-        </div>
-      )}
       {task.comments.length > 0 && (
         <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           💬 {task.comments.length} comment{task.comments.length !== 1 ? 's' : ''}
@@ -1832,144 +1338,16 @@ function TaskCard({
   );
 }
 
-function ProjectBoardView({
-  projectName,
-  tasks,
-  onTaskClick,
-  onCreateTask,
-  isAdmin
-}: {
-  projectName: string;
-  tasks: Task[];
-  onTaskClick: (task: Task) => void;
-  onCreateTask: () => void;
-  isAdmin: boolean;
-}) {
-  const statusGroups = {
-    todo: tasks.filter(t => t.status === 'todo'),
-    inProgress: tasks.filter(t => t.status === 'inProgress'),
-    review: tasks.filter(t => t.status === 'review'),
-    done: tasks.filter(t => t.status === 'done')
-  };
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">📁 {projectName}</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            {tasks.length} {tasks.length === 1 ? 'item' : 'items'} in this board
-          </p>
-        </div>
-        {isAdmin && (
-          <button
-            onClick={onCreateTask}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-          >
-            <span className="text-lg">+</span>
-            Add Item
-          </button>
-        )}
-      </div>
-
-      <div className="bg-white dark:bg-[#252525] rounded-lg p-4 border border-gray-200 dark:border-[#373737]">
-        <div className="space-y-2">
-          {tasks.length === 0 ? (
-            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-              <p className="text-lg">No items in this board yet</p>
-              {isAdmin && <p className="text-sm mt-2">Click "Add Item" to get started</p>}
-            </div>
-          ) : (
-            tasks.map(task => (
-              <div
-                key={task.id}
-                onClick={() => onTaskClick(task)}
-                className="p-4 border border-gray-200 dark:border-[#373737] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2d2d2d] cursor-pointer transition-colors"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-gray-900 dark:text-white">{task.title || 'Untitled'}</h3>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        task.status === 'done' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300' :
-                        task.status === 'review' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300' :
-                        task.status === 'inProgress' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300' :
-                        'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
-                      }`}>
-                        {task.status === 'inProgress' ? 'In Progress' :
-                         task.status === 'todo' ? 'To Do' :
-                         task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-                      </span>
-                    </div>
-                    {task.description && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">{task.description}</p>
-                    )}
-                    <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                      {task.difficulty && (
-                        <span className={`px-2 py-0.5 rounded ${
-                          task.difficulty === 'Hard' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300' :
-                          task.difficulty === 'Medium' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300' :
-                          'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300'
-                        }`}>
-                          {task.difficulty}
-                        </span>
-                      )}
-                      {task.importance && (
-                        <span className={`px-2 py-0.5 rounded ${
-                          task.importance === 'Critical' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300' :
-                          task.importance === 'High' ? 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-300' :
-                          task.importance === 'Medium' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300' :
-                          'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
-                        }`}>
-                          {task.importance}
-                        </span>
-                      )}
-                      {task.subtasks && task.subtasks.length > 0 && (
-                        <span>
-                          ✅ {task.subtasks.filter(st => st.completed).length}/{task.subtasks.length}
-                        </span>
-                      )}
-                      {task.comments && task.comments.length > 0 && (
-                        <span>💬 {task.comments.length}</span>
-                      )}
-                      {task.attachments && task.attachments.length > 0 && (
-                        <span>📎 {task.attachments.length}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      <div className="mt-6 grid grid-cols-4 gap-4">
-        {Object.entries(statusGroups).map(([status, statusTasks]) => (
-          <div key={status} className="bg-white dark:bg-[#252525] rounded-lg p-4 border border-gray-200 dark:border-[#373737]">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              {status === 'inProgress' ? 'In Progress' : status.charAt(0).toUpperCase() + status.slice(1)}
-            </h3>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{statusTasks.length}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function CalendarView({
   tasks,
   onTaskClick,
   onTaskDrop,
-  onCreateTask,
-  isAdmin
+  onCreateTask
 }: {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
   onTaskDrop: (taskId: string, updates: Partial<Task>) => void;
   onCreateTask: () => void;
-  isAdmin: boolean;
 }) {
   type DateObj = { month: number; day: number; year: number; dateStr: string };
   const [resizingTask, setResizingTask] = useState<{ taskId: string; edge: 'start' | 'end' } | null>(null);
@@ -2035,22 +1413,17 @@ function CalendarView({
   };
 
   const handleTaskDragStart = (e: React.DragEvent, task: Task) => {
-    if (!isAdmin) {
-      e.preventDefault();
-      return;
-    }
     e.dataTransfer.setData('taskId', task.id);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleEdgeMouseDown = (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => {
-    if (!isAdmin) return;
     e.stopPropagation();
     setResizingTask({ taskId: task.id, edge });
   };
 
   const handleDayMouseEnter = (dateStr: string) => {
-    if (!isAdmin || !resizingTask) return;
+    if (!resizingTask) return;
 
     const task = tasks.find(t => t.id === resizingTask.taskId);
     if (!task) return;
@@ -2132,15 +1505,13 @@ function CalendarView({
     <div className="bg-white dark:bg-[#252525] rounded-lg p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold dark:text-white">December 2025 - January 2026</h2>
-        {isAdmin && (
-          <button
-            onClick={onCreateTask}
-            className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors flex items-center gap-2"
-          >
-            <span className="text-lg">+</span>
-            Add Task
-          </button>
-        )}
+        <button
+          onClick={onCreateTask}
+          className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors flex items-center gap-2"
+        >
+          <span className="text-lg">+</span>
+          Add Task
+        </button>
       </div>
       <div className="grid grid-cols-7 gap-2">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
@@ -2194,7 +1565,7 @@ function CalendarView({
                     return (
                       <div
                         key={task.id}
-                        draggable={isAdmin && !resizingTask}
+                        draggable={!resizingTask}
                         onDragStart={(e) => handleTaskDragStart(e, task)}
                         className={`text-xs p-1 rounded cursor-pointer relative group ${
                           task.company === 'Muncho' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300' :
@@ -2217,13 +1588,13 @@ function CalendarView({
                         )}
 
                         {/* Edge resize handles */}
-                        {isAdmin && isMultiDay && isFirstDay && (
+                        {isMultiDay && isFirstDay && (
                           <div
                             className="absolute left-0 top-0 bottom-0 w-1 bg-gray-800 dark:bg-gray-400 opacity-0 group-hover:opacity-50 hover:opacity-100 cursor-ew-resize"
                             onMouseDown={(e) => handleEdgeMouseDown(e, task, 'start')}
                           />
                         )}
-                        {isAdmin && isMultiDay && isLastDay && (
+                        {isMultiDay && isLastDay && (
                           <div
                             className="absolute right-0 top-0 bottom-0 w-1 bg-gray-800 dark:bg-gray-400 opacity-0 group-hover:opacity-50 hover:opacity-100 cursor-ew-resize"
                             onMouseDown={(e) => handleEdgeMouseDown(e, task, 'end')}
@@ -2428,9 +1799,7 @@ function ChangelogView({ tasks }: { tasks: Task[] }) {
   );
 }
 
-function AnalyticsView({ tasks, currentUserName, isAdmin }: { tasks: Task[], currentUserName?: string, isAdmin: boolean }) {
-  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
-
+function AnalyticsView({ tasks }: { tasks: Task[] }) {
   // Weighting system: difficulty * importance = task weight
   const getTaskWeight = (task: Task) => {
     const difficultyWeight = task.difficulty === 'Hard' ? 3 : task.difficulty === 'Medium' ? 2 : 1;
@@ -2483,11 +1852,10 @@ function AnalyticsView({ tasks, currentUserName, isAdmin }: { tasks: Task[], cur
     return { letter: 'F', color: 'text-red-700 bg-red-100' };
   };
 
-  // Calculate metrics for each employee
-  // If not admin, only show current user's metrics
-  const membersToShow = isAdmin ? TEAM_MEMBERS : (currentUserName ? [currentUserName] : []);
-  const employeeMetrics = membersToShow.map(member => {
-    const memberTasks = tasks.filter(t => t.assignees && t.assignees.includes(member));
+  // Calculate metrics for all tasks
+  const employeeMetrics = [{
+    name: 'All Tasks',
+    memberTasks: tasks,
 
     // Helper function to check if a task is "done" from this member's perspective
     const isTaskDoneForMember = (task: Task, memberName: string): boolean => {
@@ -2891,15 +2259,13 @@ function WeekView({
   weekNumber,
   onTaskClick,
   onTaskDrop,
-  onCreateTask,
-  isAdmin
+  onCreateTask
 }: {
   tasks: Task[];
   weekNumber: number;
   onTaskClick: (task: Task) => void;
   onTaskDrop: (taskId: string, updates: Partial<Task>) => void;
   onCreateTask: () => void;
-  isAdmin: boolean;
 }) {
   const [resizingTask, setResizingTask] = useState<{ taskId: string; edge: 'start' | 'end' } | null>(null);
 
@@ -2935,22 +2301,17 @@ function WeekView({
   };
 
   const handleTaskDragStart = (e: React.DragEvent, task: Task) => {
-    if (!isAdmin) {
-      e.preventDefault();
-      return;
-    }
     e.dataTransfer.setData('taskId', task.id);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleEdgeMouseDown = (e: React.MouseEvent, task: Task, edge: 'start' | 'end') => {
-    if (!isAdmin) return;
     e.stopPropagation();
     setResizingTask({ taskId: task.id, edge });
   };
 
   const handleDayMouseEnter = (dateStr: string) => {
-    if (!isAdmin || !resizingTask) return;
+    if (!resizingTask) return;
 
     const task = tasks.find(t => t.id === resizingTask.taskId);
     if (!task) return;
@@ -3016,15 +2377,13 @@ function WeekView({
     <div className="bg-white rounded-lg p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Week {weekNumber} - January {range.start}-{range.end}, 2026</h2>
-        {isAdmin && (
-          <button
-            onClick={onCreateTask}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-          >
-            <span className="text-lg">+</span>
-            Add Task
-          </button>
-        )}
+        <button
+          onClick={onCreateTask}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+        >
+          <span className="text-lg">+</span>
+          Add Task
+        </button>
       </div>
       <div className="grid grid-cols-7 gap-4">
         {weekDays.map((dateObj) => {
@@ -3077,13 +2436,13 @@ function WeekView({
                       </div>
 
                       {/* Edge resize handles */}
-                      {isAdmin && isMultiDay && isStartDay && (
+                      {isMultiDay && isStartDay && (
                         <div
                           className="absolute left-0 top-0 bottom-0 w-2 bg-gray-800 opacity-0 group-hover:opacity-50 hover:opacity-100 cursor-ew-resize rounded-l-md"
                           onMouseDown={(e) => handleEdgeMouseDown(e, task, 'start')}
                         />
                       )}
-                      {isAdmin && isMultiDay && isEndDay && (
+                      {isMultiDay && isEndDay && (
                         <div
                           className="absolute right-0 top-0 bottom-0 w-2 bg-gray-800 opacity-0 group-hover:opacity-50 hover:opacity-100 cursor-ew-resize rounded-r-md"
                           onMouseDown={(e) => handleEdgeMouseDown(e, task, 'end')}
@@ -3157,7 +2516,6 @@ function TaskModal({
   onAddComment,
   onDelete,
   canDelete,
-  isAdmin,
   getDefaultDateForWeek
 }: {
   task: Task;
@@ -3166,7 +2524,6 @@ function TaskModal({
   onAddComment: (taskId: string, text: string) => void;
   onDelete: (taskId: string) => void;
   canDelete: boolean;
-  isAdmin: boolean;
   getDefaultDateForWeek: (weekNum: number) => string;
 }) {
   const [editedTask, setEditedTask] = useState(task);
@@ -3452,8 +2809,8 @@ function TaskModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-start mb-4">
             <h2 className="text-2xl font-bold text-gray-900">

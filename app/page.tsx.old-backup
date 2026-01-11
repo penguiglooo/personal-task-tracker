@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { BoardView } from '@/components/BoardView';
 
 interface Comment {
   id: string;
@@ -328,8 +327,8 @@ export default function DashboardPage() {
   const [newGroupMembers, setNewGroupMembers] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [boardsCollapsed, setBoardsCollapsed] = useState(true);
-  const [weeksCollapsed, setWeeksCollapsed] = useState(true);
+  const [boardsCollapsed, setBoardsCollapsed] = useState(false);
+  const [weeksCollapsed, setWeeksCollapsed] = useState(false);
   const [insightsCollapsed, setInsightsCollapsed] = useState(false);
 
   // Personal tracker - always admin mode
@@ -390,63 +389,6 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchTasks();
   }, []);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger shortcuts when typing in inputs or textareas
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-        return;
-      }
-
-      const key = e.key.toLowerCase();
-
-      switch (key) {
-        case 'h':
-          setView('home');
-          setSelectedProject(null);
-          break;
-        case 'c':
-          setView('calendar');
-          setSelectedProject(null);
-          break;
-        case 'b':
-          setView('backlog');
-          setSelectedProject(null);
-          break;
-        case 'a':
-          setView('analytics');
-          setSelectedProject(null);
-          break;
-        case '1':
-          setView('week1');
-          setSelectedProject(null);
-          break;
-        case '2':
-          setView('week2');
-          setSelectedProject(null);
-          break;
-        case '3':
-          setView('week3');
-          setSelectedProject(null);
-          break;
-        case '4':
-          setView('week4');
-          setSelectedProject(null);
-          break;
-        case 'n':
-          createTask(null, 'todo');
-          break;
-        case 'f':
-          setShowFilters(!showFilters);
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showFilters]);
 
   useEffect(() => {
     // Apply user filter and search
@@ -1292,32 +1234,6 @@ export default function DashboardPage() {
             <span>Backlog</span>
           </button>
 
-          {/* Weeks Section - Collapsible */}
-          <div className="pt-4 pb-2">
-            <button
-              onClick={() => setWeeksCollapsed(!weeksCollapsed)}
-              className="w-full flex items-center justify-between px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-            >
-              <span>Weeks</span>
-              <span className="text-base">{weeksCollapsed ? '▶' : '▼'}</span>
-            </button>
-          </div>
-
-          {!weeksCollapsed && [1, 2, 3, 4].map(week => (
-            <button
-              key={week}
-              onClick={() => setView(`week${week}`)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                view === `week${week}`
-                  ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
-                  : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
-              }`}
-            >
-              <span>W{week}</span>
-              <span className="text-xs">{[1,8,16,24][week-1]}-{[7,15,23,31][week-1]} Jan</span>
-            </button>
-          ))}
-
           {/* Boards Section - Collapsible */}
           <div className="pt-4 pb-2">
             <button
@@ -1344,6 +1260,32 @@ export default function DashboardPage() {
             >
               <span>{PROJECT_ICONS[project]}</span>
               <span>{project}</span>
+            </button>
+          ))}
+
+          {/* Weeks Section - Collapsible */}
+          <div className="pt-4 pb-2">
+            <button
+              onClick={() => setWeeksCollapsed(!weeksCollapsed)}
+              className="w-full flex items-center justify-between px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+            >
+              <span>Weeks</span>
+              <span className="text-base">{weeksCollapsed ? '▶' : '▼'}</span>
+            </button>
+          </div>
+
+          {!weeksCollapsed && [1, 2, 3, 4].map(week => (
+            <button
+              key={week}
+              onClick={() => setView(`week${week}`)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                view === `week${week}`
+                  ? 'bg-gray-100 dark:bg-[#2d2d2d] text-gray-900 dark:text-white'
+                  : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+              }`}
+            >
+              <span>W{week}</span>
+              <span className="text-xs">{[1,8,16,24][week-1]}-{[7,15,23,31][week-1]} Jan</span>
             </button>
           ))}
 
@@ -1686,12 +1628,11 @@ export default function DashboardPage() {
           ) : view === 'backlog' ? (
             renderBacklog()
           ) : view === 'project-board' && selectedProject ? (
-            <BoardView
+            <ProjectBoardView
               projectName={selectedProject}
               tasks={filteredTasks.filter(t => t.project === selectedProject)}
               onTaskClick={setSelectedTask}
               onCreateTask={() => createTask(null, 'todo')}
-              onUpdateTask={updateTask}
               isAdmin={isAdmin}
             />
           ) : (
